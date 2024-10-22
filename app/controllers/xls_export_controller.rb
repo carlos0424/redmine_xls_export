@@ -1,10 +1,5 @@
 require File.expand_path('../../../lib/xlse_asset_helpers', __FILE__)
-
-#require_dependency File.expand_path('../../../lib/xls_export', __FILE__)
-#require File.expand_path('../../lib/xls_export', __FILE__)
 require File.expand_path('../../../lib/xls_export', __FILE__)
-
-
 
 begin
   require 'zip/zip'
@@ -28,7 +23,7 @@ class XlsExportController < ApplicationController
   include QueriesHelper
   helper :issues
   include IssuesHelper
-  include XlsExport::Redmine::Export::XLS
+  include XlsExport::Redmine::Export::XLS::StripHTML
   include XlsExport::Redmine::Export::XLS::Journals  # Asegura que este módulo esté incluido para las funciones de diarios
   helper :custom_fields
   include CustomFieldsHelper
