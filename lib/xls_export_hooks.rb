@@ -1,6 +1,6 @@
 require File.expand_path('../xlse_asset_helpers', __FILE__)
 
-class XlsExportHook < Redmine::Hook::ViewListener
+class XlsExportHooks < Redmine::Hook::ViewListener
   def view_issues_index_bottom(context = {})
     if context[:query].valid? && !context[:issues].empty?
       ret_str = ''
