@@ -31,7 +31,7 @@ module Redmine
           journals = issue.journals.includes(:user, :details).
             references(:user, :details).
             reorder(:created_on, :id).to_a
-          journals.each_with_index {|j,i| j.indice = i+1}
+          journals.each_with_index {|j, i| j.indice = i + 1}
           journals.reject!(&:private_notes?) unless User.current.allowed_to?(:view_private_notes, issue.project)
           Journal.preload_journals_details_custom_fields(journals)
           journals.select! {|journal| journal.notes? || journal.visible_details.any?}
@@ -43,12 +43,12 @@ module Redmine
   end
 end
 
-# taken from 'query'
-class XLS_QueryColumn
+# Definición de la clase para las columnas de la consulta
+class XlsQueryColumn
   attr_accessor :name, :sortable, :groupable, :default_order
   include Redmine::I18n
 
-  def initialize(name, options={})
+  def initialize(name, options = {})
     self.name = name
     self.sortable = options[:sortable]
     self.groupable = options[:groupable] || false
@@ -56,14 +56,13 @@ class XLS_QueryColumn
       self.groupable = name.to_s
     end
     self.default_order = options[:default_order]
-    @caption_key = options[:caption] || "field_#{name}"
+    @caption_key = options[:caption] || "field_\#{name}"
   end
 
   def caption
     l(@caption_key)
   end
 
-  # Returns true if the column is sortable, otherwise false
   def sortable?
     !@sortable.nil?
   end
@@ -79,23 +78,9 @@ class XLS_QueryColumn
   def css_classes
     name
   end
-
-  # for redmine_category_tree plugin
-  def h(s)
-    s
-  end
-
-  # for redmine_category_tree plugin
-  def content_tag(name, content_or_options_with_block = nil, options = nil, escape = true)
-    if options[:class] == "parent"
-      content_or_options_with_block + " > "
-    else
-      content_or_options_with_block
-    end
-  end
 end
 
-class XLS_SpentTimeQueryColumn < XLS_QueryColumn
+class XlsSpentTimeQueryColumn < XlsQueryColumn
   def caption
     l(:label_spent_time)
   end
@@ -105,7 +90,7 @@ class XLS_SpentTimeQueryColumn < XLS_QueryColumn
   end
 end
 
-class XLS_AttachmentQueryColumn < XLS_QueryColumn
+class XlsAttachmentQueryColumn < XlsQueryColumn
   def caption
     l(:label_plugin_xlse_field_attachment)
   end
@@ -115,7 +100,7 @@ class XLS_AttachmentQueryColumn < XLS_QueryColumn
   end
 end
 
-class XLS_JournalQueryColumn < XLS_QueryColumn
+class XlsJournalQueryColumn < XlsQueryColumn
   include CustomFieldsHelper
   include IssuesHelper
   include Redmine::Export::XLS::StripHTML
@@ -129,21 +114,20 @@ class XLS_JournalQueryColumn < XLS_QueryColumn
     hist_str = ''
     journals = get_visible_journals(issue)
     journals.each do |journal|
-      hist_str << "#{format_time(journal.created_on)} - #{journal.user.name}\n"
+      hist_str << "\#{format_time(journal.created_on)} - \#{journal.user.name}\n"
       journal.visible_details.each do |detail|
-        hist_str <<  " - #{show_detail(detail, true)}"
+        hist_str <<  " - \#{show_detail(detail, true)}"
         hist_str << "\n" unless detail == journal.visible_details.last
       end
       if journal.notes?
-          hist_str << "\n" unless journal.visible_details.empty?
-          hist_str << journal.notes.to_s
+        hist_str << "\n" unless journal.visible_details.empty?
+        hist_str << journal.notes.to_s
       end
       hist_str << "\n" unless journal == journals.last
     end
     strip_html(hist_str, options)
   end
 end
-
 
 module Redmine
   module Export
@@ -190,19 +174,8 @@ module Redmine
         has_in_query?(query, :description)
       end
 
-      def has_spent_time?(query)
-        has_in_query?(query, :description)
-      end
-
       def use_export_description_setting?(query, options)
         if has_description?(query) == false && options[:description] == '1'
-          return true
-        end
-        return false
-      end
-
-      def use_export_spent_time?(query, options)
-        if has_spent_time?(query) == false && options[:time] == '1'
           return true
         end
         return false
@@ -231,7 +204,7 @@ module Redmine
             when :relations
               issue_columns << c if options[:relations] == '1'
             when :estimated_hours
-              issue_columns << XLS_SpentTimeQueryColumn.new(:spent_time) if use_export_spent_time?(query, options)
+              issue_columns << XlsSpentTimeQueryColumn.new(:spent_time) if options[:time] == '1'
               issue_columns << c if column_exists_for_project?(c, project)
             else
               issue_columns << c if column_exists_for_project?(c, project)
@@ -239,8 +212,8 @@ module Redmine
         end
 
         issue_columns << QueryColumn.new(:watcher) if options[:watchers] == '1'
-        issue_columns << XLS_AttachmentQueryColumn.new(:attachments) if options[:attachments] == '1'
-        issue_columns << XLS_JournalQueryColumn.new(:journal) if options[:journal] == '1'
+        issue_columns << XlsAttachmentQueryColumn.new(:attachments) if options[:attachments] == '1'
+        issue_columns << XlsJournalQueryColumn.new(:journal) if options[:journal] == '1'
         issue_columns << QueryColumn.new(:description) if use_export_description_setting?(query, options)
         issue_columns
       end
