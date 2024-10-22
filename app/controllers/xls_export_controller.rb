@@ -46,11 +46,11 @@ class XlsExportController < ApplicationController
         redirect_to :controller => 'issues', :action => 'index', :project_id => @project
       end
     end
-    @settings=XLSE_AssetHelpers::settings
+    @settings = XlseAssetHelpers::settings
   end
 
   def export_current
-    @settings=XLSE_AssetHelpers::settings
+    @settings = XlseAssetHelpers::settings
     @issues_export_offset=params[:issues_export_offset].to_i || 0
     if retrieve_xls_export_data(@settings)
       export_name = get_xls_export_name(@settings)
