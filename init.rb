@@ -1,7 +1,7 @@
 require 'redmine'
 
-# Carga el archivo helpers desde la ruta correcta
-require File.expand_path('../lib/xlse_asset_helpers', __FILE__)
+# Cargar el archivo helpers desde la ruta correcta
+require_relative 'lib/xlse_asset_helpers'
 
 # Cargar la gema rubyzip
 begin
@@ -48,7 +48,7 @@ Redmine::Plugin.register :redmine_xls_export do
 end
 
 # Requiere hooks si el archivo existe
-require File.expand_path('../config/xls_export_hooks', __FILE__) if File.exist?(File.expand_path('../config/xls_export_hooks', __FILE__))
+require_relative 'config/xls_export_hooks' if File.exist?(File.expand_path('../config/xls_export_hooks', __FILE__))
 
 # Registrando MIME types
 Mime::Type.register('application/vnd.ms-excel', :xls, %w(application/vnd.ms-excel)) unless defined?(Mime::XLS)
