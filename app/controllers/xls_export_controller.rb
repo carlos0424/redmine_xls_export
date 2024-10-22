@@ -28,7 +28,7 @@ class XlsExportController < ApplicationController
   include QueriesHelper
   helper :issues
   include IssuesHelper
-  include Redmine::Export::XLS
+  include XlsExport::Redmine::Export::XLS
   helper :custom_fields
   include CustomFieldsHelper
 
