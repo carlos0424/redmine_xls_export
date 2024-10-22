@@ -106,21 +106,15 @@ module XlsExport
         end
         
         class XLS_AttachmentQueryColumn < XLS_QueryColumn
-          include ActionController::UrlFor
-          include Rails.application.routes.url_helpers
-        
           def caption
-            l(:field_attachments)
+            l(:label_plugin_xlse_field_attachment)
           end
         
           def value(issue)
-            attachments = issue.attachments || []
-            attachments.map do |attachment|
-              attachment_url = url_for(controller: 'attachments', action: 'download', id: attachment.id, filename: attachment.filename)
-              "#{attachment.filename} (#{attachment_url})"
-            end.join("\n")
+            issue.attachments.to_a.map { |a| a.filename }.join("\n")
           end
         end
+        
         
         
         # Métodos de módulo
