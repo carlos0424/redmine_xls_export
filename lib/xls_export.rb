@@ -326,7 +326,9 @@ module XlsExport
                       ''
                     end
                   when :attachments
-                    c.value(issue).to_a.map {|a| a.filename}.join("\n")
+                    attachments = c.value(issue)
+                    attachments = [attachments] unless attachments.is_a?(Array)
+                    attachments.map { |a| a.filename }.join("\n")
                   when :journal
                     c.value(issue, options)
                   when :project
