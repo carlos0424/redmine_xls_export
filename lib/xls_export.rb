@@ -3,6 +3,7 @@ require 'uri'
 require 'rubygems'
 require 'nokogiri'
 
+module XlsExport
 module Redmine
   module Export
     module XLS
@@ -19,6 +20,7 @@ module Redmine
       end
     end
   end
+end
 end
 
 module Redmine
