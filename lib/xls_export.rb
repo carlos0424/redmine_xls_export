@@ -106,6 +106,8 @@ module XlsExport
         end
         
         class XLS_AttachmentQueryColumn < XLS_QueryColumn
+          include Redmine::I18n  # Aseguramos que el método `l` esté disponible
+        
           def caption
             l(:label_plugin_xlse_field_attachment)
           end
@@ -114,6 +116,7 @@ module XlsExport
             issue.attachments.to_a.map { |a| a.filename }.join("\n")
           end
         end
+        
         
         
         
