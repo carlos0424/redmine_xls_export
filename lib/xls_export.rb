@@ -78,18 +78,20 @@ module XlsExport
           include IssuesHelper
           include XlsExport::Redmine::Export::XLS::StripHTML
           include XlsExport::Redmine::Export::XLS::Journals
-
+        
           def caption
             l(:label_plugin_xlse_field_journal)
           end
-
+        
           def value(issue, options)
             hist_str = ''
-            journals = get_visible_journals(issue)
+            journals = get_visible_journals(issue) || [] # Aseguramos que journals sea un array
+            options ||= {} # Garantizamos que options no sea nil
+        
             journals.each do |journal|
               hist_str << "#{format_time(journal.created_on)} - #{journal.user.name}\n"
               journal.visible_details.each do |detail|
-                hist_str <<  " - #{show_detail(detail, true)}"
+                hist_str << " - #{show_detail(detail, true)}"
                 hist_str << "\n" unless detail == journal.visible_details.last
               end
               if journal.notes?
@@ -98,9 +100,11 @@ module XlsExport
               end
               hist_str << "\n" unless journal == journals.last
             end
+            
             strip_html(hist_str, options)
           end
         end
+        
 
         # Métodos de módulo
         module_function
