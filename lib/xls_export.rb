@@ -106,24 +106,22 @@ module XlsExport
         end
         
         class XLS_AttachmentQueryColumn < XLS_QueryColumn
-          include CustomFieldsHelper
-          include IssuesHelper
+          include ActionController::UrlFor
+          include Rails.application.routes.url_helpers
         
           def caption
-            l(:label_attachment_plural)
+            l(:field_attachments)
           end
         
           def value(issue)
-            # Recorre todos los archivos adjuntos asociados al issue y devuelve sus nombres de archivo y URLs
-            attachments = issue.attachments.map do |attachment|
+            attachments = issue.attachments || []
+            attachments.map do |attachment|
               attachment_url = url_for(controller: 'attachments', action: 'download', id: attachment.id, filename: attachment.filename)
-              "#{attachment.filename} (#{attachment.filesize} bytes)\n#{attachment_url}"
-            end
-        
-            # Devuelve los adjuntos como un string separados por una nueva línea
-            attachments.join("\n")
+              "#{attachment.filename} (#{attachment_url})"
+            end.join("\n")
           end
         end
+        
         
         # Métodos de módulo
         module_function
