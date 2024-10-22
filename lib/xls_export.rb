@@ -3,61 +3,59 @@ require 'uri'
 require 'rubygems'
 require 'nokogiri'
 
-module Redmine
-  module Export
-    module XLS
-      module StripHTML
-        def strip_html(str, options)
-          if options[:strip_html_tags] == '1'
-            document = Nokogiri::HTML.parse(str)
-            document.css("br").each { |node| node.replace("\n") }
-            document.text
-          else
-            str
+# Módulo principal que Zeitwerk espera
+module XlsExport
+  # Submódulos existentes
+  module Redmine
+    module Export
+      module XLS
+        module StripHTML
+          def strip_html(str, options)
+            if options[:strip_html_tags] == '1'
+              document = Nokogiri::HTML.parse(str)
+              document.css("br").each { |node| node.replace("\n") }
+              document.text
+            else
+              str
+            end
           end
         end
-      end
-    end
-  end
-end
 
-module Redmine
-  module Export
-    module XLS
-      module Journals
-        def get_visible_journals(issue)
-          return issue.visible_journals_with_index if (issue.respond_to? :visible_journals_with_index)
+        module Journals
+          def get_visible_journals(issue)
+            return issue.visible_journals_with_index if (issue.respond_to? :visible_journals_with_index)
 
-          journals = issue.journals.includes(:user, :details).
-            references(:user, :details).
-            reorder(:created_on, :id).to_a
-          journals.each_with_index {|j, i| j.indice = i + 1}
-          journals.reject!(&:private_notes?) unless User.current.allowed_to?(:view_private_notes, issue.project)
-          Journal.preload_journals_details_custom_fields(journals)
-          journals.select! {|journal| journal.notes? || journal.visible_details.any?}
-          journals.reverse! if User.current.wants_comments_in_reverse_order?
-          journals
+            journals = issue.journals.includes(:user, :details).
+              references(:user, :details).
+              reorder(:created_on, :id).to_a
+            journals.each_with_index {|j, i| j.indice = i + 1}
+            journals.reject!(&:private_notes?) unless User.current.allowed_to?(:view_private_notes, issue.project)
+            Journal.preload_journals_details_custom_fields(journals)
+            journals.select! {|journal| journal.notes? || journal.visible_details.any?}
+            journals.reverse! if User.current.wants_comments_in_reverse_order?
+            journals
+          end
         end
-      end
-    end
-  end
-end
 
-# Definición de la clase para las columnas de la consulta
-class XlsQueryColumn
-  attr_accessor :name, :sortable, :groupable, :default_order
-  include Redmine::I18n
+        # Incluir los módulos necesarios
+        include StripHTML
+        include Journals
+        
+        # El resto de tus clases (moverlas dentro del módulo XlsExport)
+        class XlsQueryColumn
+          attr_accessor :name, :sortable, :groupable, :default_order
+          include ::Redmine::I18n
 
-  def initialize(name, options = {})
-    self.name = name
-    self.sortable = options[:sortable]
-    self.groupable = options[:groupable] || false
-    if groupable == true
-      self.groupable = name.to_s
-    end
-    self.default_order = options[:default_order]
-    @caption_key = options[:caption] || "field_\#{name}"
-  end
+          def initialize(name, options = {})
+            self.name = name
+            self.sortable = options[:sortable]
+            self.groupable = options[:groupable] || false
+            if groupable == true
+              self.groupable = name.to_s
+            end
+            self.default_order = options[:default_order]
+            @caption_key = options[:caption] || "field_#{name}"
+          end
 
   def caption
     l(@caption_key)
@@ -129,12 +127,8 @@ class XlsJournalQueryColumn < XlsQueryColumn
   end
 end
 
-module Redmine
-  module Export
-    module XLS
-      include Redmine::Export::XLS::StripHTML
-      include Redmine::Export::XLS::Journals
-      unloadable
+        # Todos los métodos que estaban en el módulo XLS original
+        module_function
 
       def show_value_for_xls(value)
         if CustomFieldsHelper.instance_method(:show_value).arity == 1
@@ -650,4 +644,5 @@ module Redmine
 
     end
   end
+end
 end
