@@ -636,3 +636,4 @@ module Redmine
   end # Final del módulo Export
 end # Final del módulo Redmine
 end # Final del módulo XlsExport
+end # Final del módulo XlsExport
