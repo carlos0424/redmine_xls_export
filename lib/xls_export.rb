@@ -3,7 +3,7 @@ require 'uri'
 require 'rubygems'
 require 'nokogiri'
 
-module XlsExport
+# Define el módulo StripHTML antes de su uso
 module Redmine
   module Export
     module XLS
@@ -21,8 +21,8 @@ module Redmine
     end
   end
 end
-end
 
+# Define el resto del código después de cargar StripHTML
 module Redmine
   module Export
     module XLS
@@ -45,78 +45,7 @@ module Redmine
   end
 end
 
-# taken from 'query'
-class XLS_QueryColumn
-  attr_accessor :name, :sortable, :groupable, :default_order
-  include Redmine::I18n
-
-  def initialize(name, options={})
-    self.name = name
-    self.sortable = options[:sortable]
-    self.groupable = options[:groupable] || false
-    if groupable == true
-      self.groupable = name.to_s
-    end
-    self.default_order = options[:default_order]
-    @caption_key = options[:caption] || "field_#{name}"
-  end
-
-  def caption
-    l(@caption_key)
-  end
-
-  # Returns true if the column is sortable, otherwise false
-  def sortable?
-    !@sortable.nil?
-  end
-
-  def sortable
-    @sortable.is_a?(Proc) ? @sortable.call : @sortable
-  end
-
-  def value(issue)
-    issue.send name
-  end
-
-  def css_classes
-    name
-  end
-
-  # for redmine_category_tree plugin
-  def h(s)
-    s
-  end
-
-  # for redmine_category_tree plugin
-  def content_tag(name, content_or_options_with_block = nil, options = nil, escape = true)
-    if options[:class] == "parent"
-      content_or_options_with_block + " > "
-    else
-      content_or_options_with_block
-    end
-  end
-end
-
-class XLS_SpentTimeQueryColumn < XLS_QueryColumn
-  def caption
-    l(:label_spent_time)
-  end
-
-  def value(issue)
-    issue.spent_hours
-  end
-end
-
-class XLS_AttachmentQueryColumn < XLS_QueryColumn
-  def caption
-    l(:label_plugin_xlse_field_attachment)
-  end
-
-  def value(issue)
-    issue.attachments
-  end
-end
-
+# Asegúrate de que StripHTML está cargado aquí
 class XLS_JournalQueryColumn < XLS_QueryColumn
   include CustomFieldsHelper
   include IssuesHelper
@@ -137,14 +66,17 @@ class XLS_JournalQueryColumn < XLS_QueryColumn
         hist_str << "\n" unless detail == journal.visible_details.last
       end
       if journal.notes?
-          hist_str << "\n" unless journal.visible_details.empty?
-          hist_str << journal.notes.to_s
+        hist_str << "\n" unless journal.visible_details.empty?
+        hist_str << journal.notes.to_s
       end
       hist_str << "\n" unless journal == journals.last
     end
     strip_html(hist_str, options)
   end
 end
+
+# Resto del código ...
+
 
 
 module Redmine
