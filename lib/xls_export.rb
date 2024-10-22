@@ -3,116 +3,102 @@ require 'uri'
 require 'rubygems'
 require 'nokogiri'
 
-# Define el módulo StripHTML antes de su uso
-module Redmine
-  module Export
-    module XLS
-      module StripHTML
-        def strip_html(str, options)
-          if options[:strip_html_tags] == '1'
-            document = Nokogiri::HTML.parse(str)
-            document.css("br").each { |node| node.replace("\n") }
-            document.text
-          else
-            str
+module XlsExport
+  module Redmine
+    module Export
+      module XLS
+        module StripHTML
+          def strip_html(str, options)
+            if options[:strip_html_tags] == '1'
+              document = Nokogiri::HTML.parse(str)
+              document.css("br").each { |node| node.replace("\n") }
+              document.text
+            else
+              str
+            end
           end
         end
-      end
-    end
-  end
-end
 
-# Define el resto del código después de cargar StripHTML
-module Redmine
-  module Export
-    module XLS
-      module Journals
-        def get_visible_journals(issue)
-          return issue.visible_journals_with_index if (issue.respond_to? :visible_journals_with_index)
+        module Journals
+          def get_visible_journals(issue)
+            return issue.visible_journals_with_index if (issue.respond_to? :visible_journals_with_index)
 
-          journals = issue.journals.includes(:user, :details).
-            references(:user, :details).
-            reorder(:created_on, :id).to_a
-          journals.each_with_index {|j,i| j.indice = i+1}
-          journals.reject!(&:private_notes?) unless User.current.allowed_to?(:view_private_notes, issue.project)
-          Journal.preload_journals_details_custom_fields(journals)
-          journals.select! {|journal| journal.notes? || journal.visible_details.any?}
-          journals.reverse! if User.current.wants_comments_in_reverse_order?
-          journals
+            journals = issue.journals.includes(:user, :details).
+              references(:user, :details).
+              reorder(:created_on, :id).to_a
+            journals.each_with_index {|j,i| j.indice = i+1}
+            journals.reject!(&:private_notes?) unless User.current.allowed_to?(:view_private_notes, issue.project)
+            Journal.preload_journals_details_custom_fields(journals)
+            journals.select! {|journal| journal.notes? || journal.visible_details.any?}
+            journals.reverse! if User.current.wants_comments_in_reverse_order?
+            journals
+          end
         end
-      end
-    end
-  end
-end
 
-class XLS_QueryColumn
-  attr_accessor :name, :sortable, :groupable, :default_order
-  include Redmine::I18n
+        class XLS_QueryColumn
+          attr_accessor :name, :sortable, :groupable, :default_order
+          include Redmine::I18n
 
-  def initialize(name, options={})
-    self.name = name
-    self.sortable = options[:sortable]
-    self.groupable = options[:groupable] || false
-    if groupable == true
-      self.groupable = name.to_s
-    end
-    self.default_order = options[:default_order]
-    @caption_key = options[:caption] || "field_#{name}"
-  end
+          def initialize(name, options={})
+            self.name = name
+            self.sortable = options[:sortable]
+            self.groupable = options[:groupable] || false
+            if groupable == true
+              self.groupable = name.to_s
+            end
+            self.default_order = options[:default_order]
+            @caption_key = options[:caption] || "field_#{name}"
+          end
 
-  def caption
-    l(@caption_key)
-  end
+          def caption
+            l(@caption_key)
+          end
 
-  def sortable?
-    !@sortable.nil?
-  end
+          def sortable?
+            !@sortable.nil?
+          end
 
-  def sortable
-    @sortable.is_a?(Proc) ? @sortable.call : @sortable
-  end
+          def sortable
+            @sortable.is_a?(Proc) ? @sortable.call : @sortable
+          end
 
-  def value(issue)
-    issue.send name
-  end
+          def value(issue)
+            issue.send name
+          end
 
-  def css_classes
-    name
-  end
-end
+          def css_classes
+            name
+          end
+        end
 
-# Asegúrate de que StripHTML está cargado aquí
-class XLS_JournalQueryColumn < XLS_QueryColumn
-  include CustomFieldsHelper
-  include IssuesHelper
-  include Redmine::Export::XLS::StripHTML
-  include Redmine::Export::XLS::Journals
+        class XLS_JournalQueryColumn < XLS_QueryColumn
+          include CustomFieldsHelper
+          include IssuesHelper
+          include XlsExport::Redmine::Export::XLS::StripHTML
+          include XlsExport::Redmine::Export::XLS::Journals
 
-  def caption
-    l(:label_plugin_xlse_field_journal)
-  end
+          def caption
+            l(:label_plugin_xlse_field_journal)
+          end
 
-  def value(issue, options)
-    hist_str = ''
-    journals = get_visible_journals(issue)
-    journals.each do |journal|
-      hist_str << "#{format_time(journal.created_on)} - #{journal.user.name}\n"
-      journal.visible_details.each do |detail|
-        hist_str <<  " - #{show_detail(detail, true)}"
-        hist_str << "\n" unless detail == journal.visible_details.last
-      end
-      if journal.notes?
-        hist_str << "\n" unless journal.visible_details.empty?
-        hist_str << journal.notes.to_s
-      end
-      hist_str << "\n" unless journal == journals.last
-    end
-    strip_html(hist_str, options)
-  end
-end
-
-# Resto del código ...
-
+          def value(issue, options)
+            hist_str = ''
+            journals = get_visible_journals(issue)
+            journals.each do |journal|
+              hist_str << "#{format_time(journal.created_on)} - #{journal.user.name}\n"
+              journal.visible_details.each do |detail|
+                hist_str <<  " - #{show_detail(detail, true)}"
+                hist_str << "\n" unless detail == journal.visible_details.last
+              end
+              if journal.notes?
+                hist_str << "\n" unless journal.visible_details.empty?
+                hist_str << journal.notes.to_s
+              end
+              hist_str << "\n" unless journal == journals.last
+            end
+            strip_html(hist_str, options)
+          end
+        end
 
 
 module Redmine
