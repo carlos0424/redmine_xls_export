@@ -1,5 +1,5 @@
 module XlseAssetHelpers
-  PLUGIN_NAME = File.expand_path('../../*', __FILE__).match(/.*\/(.*)\/\*$/)[1].to_sym
+  PLUGIN_NAME = 'redmine_xls_export'.to_sym
 
   def self.settings
     Setting["plugin_#{PLUGIN_NAME.to_s}"]
