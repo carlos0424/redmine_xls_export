@@ -1,4 +1,5 @@
 require_dependency 'spreadsheet'
+require_dependency 'redmine/i18n'
 require 'uri'
 require 'rubygems'
 require 'nokogiri'
