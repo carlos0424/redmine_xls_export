@@ -9,9 +9,13 @@ rescue LoadError => e
 end
 
 # Cargar los helpers y librerías del plugin
-require File.expand_path('../lib/xls_export', __FILE__)
-require File.expand_path('../lib/xlse_asset_helpers', __FILE__)
-require File.expand_path('../lib/xls_export_hooks', __FILE__)
+#require File.expand_path('../lib/xls_export', __FILE__)
+#require File.expand_path('../lib/xlse_asset_helpers', __FILE__)
+#require File.expand_path('../lib/xls_export_hooks', __FILE__)
+require_dependency 'xls_export'
+require_dependency 'xlse_asset_helpers'
+require_dependency 'xls_export_hooks'
+
 
 # Registro del Plugin en Redmine
 Redmine::Plugin.register :redmine_xls_export do
@@ -62,7 +66,7 @@ end
 # Cargar los assets
 Rails.configuration.to_prepare do
   # Asegurarse de que los assets se cargan correctamente
-  require_dependency 'issue'
-  require_dependency 'query'
-  require_dependency 'issue_query'
+#  require_dependency 'issue'
+#  require_dependency 'query'
+#  require_dependency 'issue_query'
 end

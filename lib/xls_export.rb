@@ -88,6 +88,10 @@ class XlsSpentTimeQueryColumn < XlsQueryColumn
   end
 end
 
+class XlsExportHooks < Redmine::Hook::ViewListener
+  # Aquí puedes agregar los métodos necesarios
+end
+
 class XlsAttachmentQueryColumn < XlsQueryColumn
   def caption
     l(:label_plugin_xlse_field_attachment)
