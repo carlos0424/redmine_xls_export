@@ -1,4 +1,5 @@
-require 'xlse_asset_helpers'
+require File.expand_path('../../../lib/xlse_asset_helpers', __FILE__)
+
 require_dependency 'xls_export'
 begin
   require 'zip/zip'
