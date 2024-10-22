@@ -1,4 +1,4 @@
-module XLSE_AssetHelpers
+module XlseAssetHelpers
   PLUGIN_NAME = File.basename(File.expand_path('../..', __dir__)).to_sym
 
   def self.settings
