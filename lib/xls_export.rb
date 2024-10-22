@@ -228,121 +228,122 @@ module XlsExport
         end
 
         def issues_to_xls2(issues, project, query, options = {})
-  Spreadsheet.client_encoding = 'UTF-8'
-
-  date_formats = init_date_formats(options)
-  group_by_query = query.grouped? ? options[:group] : false
-  book = Spreadsheet::Workbook.new
-  issue_columns = create_issue_columns(project, query, options)
-
-  sheet1 = nil
-  group = false
-  columns_width = []
-  idx = 0
-
-  issues.each do |issue|
-    if group_by_query == '1'
-      new_group = query_get_group_column_name(issue, query)
-      if new_group != group
-        group = new_group
-        update_sheet_formatting(sheet1, columns_width) if sheet1
-        sheet1 = book.create_worksheet(:name => (group.blank? ? l(:label_none) : pretty_xls_tab_name(group.to_s)))
-        columns_width = init_header_columns(query, sheet1, issue_columns, date_formats)
+        Spreadsheet.client_encoding = 'UTF-8'
+      
+        date_formats = init_date_formats(options)
+      
+        group_by_query = query.grouped? ? options[:group] : false
+        book = Spreadsheet::Workbook.new
+        issue_columns = create_issue_columns(project, query, options)
+      
+        sheet1 = nil
+        group = false
+        columns_width = []
         idx = 0
-      end
-    else
-      sheet1 ||= book.create_worksheet(:name => l(:label_issue_plural))
-      columns_width ||= init_header_columns(query, sheet1, issue_columns, date_formats)
-    end
-
-    row = sheet1.row(idx + 1)
-    init_row(row, query, issue.id)
-
-    lf_pos = get_value_width(issue.id)
-    columns_width[0] = lf_pos unless columns_width[0] >= lf_pos
-
-    last_prj = project
-
-    issue_columns.each_with_index do |c, j|
-      v = if c.is_a?(QueryCustomFieldColumn)
-            case c.custom_field.field_format
-            when "int"
-              begin
-                Integer(issue.custom_value_for(c.custom_field).to_s)
-              rescue
-                show_value_for_xls(issue.custom_value_for(c.custom_field))
-              end
-            when "float"
-              begin
-                Float(issue.custom_value_for(c.custom_field).to_s)
-              rescue
-                show_value_for_xls(issue.custom_value_for(c.custom_field))
-              end
-            when "date"
-              begin
-                Date.parse(issue.custom_value_for(c.custom_field).to_s)
-              rescue
-                show_value_for_xls(issue.custom_value_for(c.custom_field))
-              end
-            else
-              value = issue.custom_field_values.detect { |v| v.custom_field == c.custom_field }
-              show_value_for_xls(value) unless value.nil?
+      
+        issues.each do |issue|
+          if group_by_query == '1'
+            new_group = query_get_group_column_name(issue, query)
+            if new_group != group
+              group = new_group
+              update_sheet_formatting(sheet1, columns_width) if sheet1
+              sheet1 = book.create_worksheet(:name => (group.blank? ? l(:label_none) : pretty_xls_tab_name(group.to_s)))
+              columns_width = init_header_columns(query, sheet1, issue_columns, date_formats)
+              idx = 0
             end
           else
-            case c.name
-            when :done_ratio
-              (Float(issue.send(c.name))) / 100
-            when :description
-              strip_html(issue.description.to_s.gsub("\r", ""), options)
-            when :relations
-              relations = issue.relations.select { |r| r.other_issue(issue).visible? }
-              relations.map { |relation| "#{l(relation.label_for(issue))} #{relation.other_issue(issue).tracker} ##{relation.other_issue(issue).id}" }.join("\n")
-            when :watcher
-              issue.watcher_users.collect(&:to_s).join("\n") if User.current.allowed_to?(:view_issue_watchers, last_prj)
-            when :spent_time
-              c.value(issue) if User.current.allowed_to?(:view_time_entries, last_prj)
-            when :attachments
-              attachments = Array(c.value(issue)) # Asegura que sea un array
-              attachments.compact.select { |a| a.respond_to?(:filename) }.map { |a| a.filename }.join("\n")
-            when :journal
-              c.value(issue, options)
-            when :project
-              last_prj = issue.send(c.name)
-            when :created_on, :updated_on, :closed_on
-              datetime = issue.respond_to?(c.name) ? issue.send(c.name) : c.value(issue)
-              localtime(datetime)
-            when :"parent.subject"
-              issue.parent&.subject.to_s
-            else
-              issue.respond_to?(c.name) ? issue.send(c.name) : c.value(issue)
-            end
+            sheet1 ||= book.create_worksheet(:name => l(:label_issue_plural))
+            columns_width ||= init_header_columns(query, sheet1, issue_columns, date_formats)
           end
-
-      value = %w(Time Date Fixnum Float Integer String).include?(v.class.name) ? v : v.to_s
-
-      lf_pos = get_value_width(value)
-      index = has_id?(query) ? j : j + 1
-      columns_width[index] = lf_pos unless columns_width[index] >= lf_pos
-      c.name == :id ? insert_issue_id(row, issue) : row << value
-    end
-
-    idx += 1
-
-    journal_details_to_xls(issue, options, book) if options[:journal_worksheets]
-  end
-
-  if sheet1
-    update_sheet_formatting(sheet1, columns_width)
-  else
-    sheet1 = book.create_worksheet(:name => 'Issues')
-    sheet1.row(0).replace [l(:label_no_data)]
-  end
-
-  xls_stream = StringIO.new('')
-  book.write(xls_stream)
-  xls_stream.string
-end
-
+      
+          row = sheet1.row(idx + 1)
+          init_row(row, query, issue.id)
+      
+          lf_pos = get_value_width(issue.id)
+          columns_width[0] = lf_pos if columns_width[0].nil? || columns_width[0] < lf_pos
+      
+          last_prj = project
+      
+          issue_columns.each_with_index do |c, j|
+            v = if c.is_a?(QueryCustomFieldColumn)
+                  case c.custom_field.field_format
+                  when "int"
+                    begin
+                      Integer(issue.custom_value_for(c.custom_field).to_s)
+                    rescue
+                      show_value_for_xls(issue.custom_value_for(c.custom_field))
+                    end
+                  when "float"
+                    begin
+                      Float(issue.custom_value_for(c.custom_field).to_s)
+                    rescue
+                      show_value_for_xls(issue.custom_value_for(c.custom_field))
+                    end
+                  when "date"
+                    begin
+                      Date.parse(issue.custom_value_for(c.custom_field).to_s)
+                    rescue
+                      show_value_for_xls(issue.custom_value_for(c.custom_field))
+                    end
+                  else
+                    value = issue.custom_field_values.detect { |v| v.custom_field == c.custom_field }
+                    show_value_for_xls(value) unless value.nil?
+                  end
+                else
+                  case c.name
+                  when :done_ratio
+                    (Float(issue.send(c.name))) / 100
+                  when :description
+                    strip_html(issue.description.to_s.gsub("\r", ""), options)
+                  when :relations
+                    relations = issue.relations.select { |r| r.other_issue(issue).visible? }
+                    relations.map { |relation| "#{l(relation.label_for(issue))} #{relation.other_issue(issue).tracker} ##{relation.other_issue(issue).id}" }.join("\n")
+                  when :watcher
+                    issue.watcher_users.collect(&:to_s).join("\n") if User.current.allowed_to?(:view_issue_watchers, last_prj)
+                  when :spent_time
+                    c.value(issue) if User.current.allowed_to?(:view_time_entries, last_prj)
+                  when :attachments
+                    attachments = Array(c.value(issue)) # Asegura que sea un array
+                    attachments.compact.select { |a| a.respond_to?(:filename) }.map { |a| a.filename }.join("\n")
+                  when :journal
+                    c.value(issue, options)
+                  when :project
+                    last_prj = issue.send(c.name)
+                  when :created_on, :updated_on, :closed_on
+                    datetime = issue.respond_to?(c.name) ? issue.send(c.name) : c.value(issue)
+                    localtime(datetime)
+                  when :"parent.subject"
+                    issue.parent&.subject.to_s
+                  else
+                    issue.respond_to?(c.name) ? issue.send(c.name) : c.value(issue)
+                  end
+                end
+      
+            value = %w(Time Date Fixnum Float Integer String).include?(v.class.name) ? v : v.to_s
+      
+            lf_pos = get_value_width(value)
+            index = has_id?(query) ? j : j + 1
+            columns_width[index] = lf_pos if columns_width[index].nil? || columns_width[index] < lf_pos
+            c.name == :id ? insert_issue_id(row, issue) : row << value
+          end
+      
+          idx += 1
+      
+          journal_details_to_xls(issue, options, book) if options[:journal_worksheets]
+        end
+      
+        if sheet1
+          update_sheet_formatting(sheet1, columns_width)
+        else
+          sheet1 = book.create_worksheet(:name => 'Issues')
+          sheet1.row(0).replace [l(:label_no_data)]
+        end
+      
+        xls_stream = StringIO.new('')
+        book.write(xls_stream)
+        xls_stream.string
+      end
+      
 
         def journal_details_to_xls(issue, options, book_to_add = nil)
           journals = get_visible_journals(issue)
