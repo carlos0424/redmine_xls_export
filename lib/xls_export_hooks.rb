@@ -1,4 +1,5 @@
-require File.expand_path('../xlse_asset_helpers', __FILE__)
+#require File.expand_path('../xlse_asset_helpers', __FILE__)
+require File.expand_path('../lib/xlse_asset_helpers', __FILE__)
 
 class XlsExportHooks < Redmine::Hook::ViewListener
   def view_issues_index_bottom(context = {})
