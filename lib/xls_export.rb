@@ -1,5 +1,5 @@
 require_dependency 'spreadsheet'
-require_dependency 'redmine/i18n'
+require_dependency 'redmine/i18n'  # Asegura que se cargue Redmine::I18n
 require 'erb'
 require 'uri'
 require 'rubygems'
