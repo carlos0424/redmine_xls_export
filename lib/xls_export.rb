@@ -100,317 +100,294 @@ module XlsExport
           end
         end
 
+        # Métodos de módulo
+        module_function
 
-module Redmine
-  module Export
-    module XLS
-      include Redmine::Export::XLS::StripHTML
-      include Redmine::Export::XLS::Journals
-      unloadable
-
-      def show_value_for_xls(value)
-        if CustomFieldsHelper.instance_method(:show_value).arity == 1
-          show_value(value)
-        else
-          show_value(value, false)
-        end
-      end
-
-      def add_date_format(date_formats, tag, format, default)
-        date_formats[tag] = (format == nil) ? default : format
-      end
-
-      def init_date_formats(options)
-        date_formats = {}
-        add_date_format(date_formats, :created_on, options[:created_format], l("default_created_format"))
-        add_date_format(date_formats, :updated_on, options[:updated_format], l("default_updated_format"))
-        add_date_format(date_formats, :start_date, options[:start_date_format],l("default_start_date_format"))
-        add_date_format(date_formats, :due_date, options[:due_date_format], l("default_due_date_format"))
-        add_date_format(date_formats, :closed_on, options[:closed_date_format], l("default_closed_date_format"))
-
-        date_formats
-      end
-
-      def has_in_query?(query, name)
-        query.available_columns.each do |c|
-          return true if c.name == name
-        end
-        return false
-      end
-
-      def has_id?(query)
-        has_in_query?(query, :id)
-      end
-
-      def has_description?(query)
-        has_in_query?(query, :description)
-      end
-
-      def has_spent_time?(query)
-        has_in_query?(query, :description)
-      end
-
-      def use_export_description_setting?(query, options)
-        if has_description?(query) == false && options[:description] == '1'
-          return true
-        end
-        return false
-      end
-
-      def use_export_spent_time?(query, options)
-        if has_spent_time?(query) == false && options[:time] == '1'
-          return true
-        end
-        return false
-      end
-
-      def init_row(row, query, first)
-        if has_id?(query)
-          row.replace []
-        else
-          row.replace [first]
-        end
-      end
-
-      def insert_issue_id(row, issue)
-        issue_url = url_for(:controller => 'issues', :action => 'show', :id => issue)
-        row << Spreadsheet::Link.new(URI.escape(issue_url), issue.id.to_s)
-        format_link = Spreadsheet::Format.new :color => :blue, :underline => :single
-        row.set_format(row.size - 1, format_link)
-      end
-
-      def create_issue_columns(project, query, options)
-        issue_columns = []
-
-        (options[:query_columns_only] == '1' ? query.columns : query.available_columns).each do |c|
-          case c.name
-            when :relations
-              issue_columns << c if options[:relations] == '1'
-            when :estimated_hours
-              issue_columns << XLS_SpentTimeQueryColumn.new(:spent_time) if use_export_spent_time?(query, options)
-              issue_columns << c if column_exists_for_project?(c, project)
-            else
-              issue_columns << c if column_exists_for_project?(c, project)
-          end
-        end
-
-        issue_columns << QueryColumn.new(:watcher) if options[:watchers] == '1'
-        issue_columns << XLS_AttachmentQueryColumn.new(:attachments) if options[:attachments] == '1'
-        issue_columns << XLS_JournalQueryColumn.new(:journal) if options[:journal] == '1'
-        issue_columns << QueryColumn.new(:description) if use_export_description_setting?(query, options)
-        issue_columns
-      end
-
-      def localtime(datetime)
-        if datetime
-          User.current.time_zone ? datetime.in_time_zone(User.current.time_zone) : datetime.localtime
-        end
-      end
-
-# options are
-# :relations - export relations
-# :watchers - export watchers
-# :time - export time spent
-# :journal - export journal entries
-# :journal_worksheets - export journal entries to worksheets
-# :description - export descriptions
-# :attachments - export attachments info
-# :query_columns_only - export only columns from actual query
-# :group - group by query grouping
-      def issues_to_xls2(issues, project, query, options = {})
-
-        Spreadsheet.client_encoding = 'UTF-8'
-
-        date_formats = init_date_formats(options);
-
-        group_by_query=query.grouped? ? options[:group] : false
-        book = Spreadsheet::Workbook.new
-        issue_columns = create_issue_columns(project, query, options)
-
-        sheet1 = nil
-        group = false
-        columns_width = []
-        idx = 0
-# xls rows
-        issues.each do |issue|
-          if group_by_query == '1'
-            new_group=query_get_group_column_name(issue,query)
-            if new_group != group
-              group = new_group
-              update_sheet_formatting(sheet1,columns_width) if sheet1
-              sheet1 = book.create_worksheet(:name => (group.blank? ? l(:label_none) : pretty_xls_tab_name(group.to_s)))
-              columns_width=init_header_columns(query, sheet1,issue_columns,date_formats)
-              idx = 0
-            end
+        def show_value_for_xls(value)
+          if CustomFieldsHelper.instance_method(:show_value).arity == 1
+            show_value(value)
           else
-            if sheet1 == nil
-              sheet1 = book.create_worksheet(:name => l(:label_issue_plural))
-              columns_width=init_header_columns(query, sheet1,issue_columns,date_formats)
-            end
+            show_value(value, false)
           end
+        end
 
-          row = sheet1.row(idx+1)
-          init_row(row, query, issue.id)
+        def add_date_format(date_formats, tag, format, default)
+          date_formats[tag] = (format == nil) ? default : format
+        end
 
-          lf_pos = get_value_width(issue.id)
-          columns_width[0] = lf_pos unless columns_width[0] >= lf_pos
+        def init_date_formats(options)
+          date_formats = {}
+          add_date_format(date_formats, :created_on, options[:created_format], l("default_created_format"))
+          add_date_format(date_formats, :updated_on, options[:updated_format], l("default_updated_format"))
+          add_date_format(date_formats, :start_date, options[:start_date_format],l("default_start_date_format"))
+          add_date_format(date_formats, :due_date, options[:due_date_format], l("default_due_date_format"))
+          add_date_format(date_formats, :closed_on, options[:closed_date_format], l("default_closed_date_format"))
+          date_formats
+        end
 
-          last_prj = project
+        def has_in_query?(query, name)
+          query.available_columns.each do |c|
+            return true if c.name == name
+          end
+          false
+        end
 
-          issue_columns.each_with_index do |c, j|
-            v = if c.is_a?(QueryCustomFieldColumn)
-              case c.custom_field.field_format
-                when "int"
-                  begin
-                    Integer(issue.custom_value_for(c.custom_field).to_s)
-                  rescue
-                    show_value_for_xls(issue.custom_value_for(c.custom_field))
-                  end
-                when "float"
-                  begin
-                    Float(issue.custom_value_for(c.custom_field).to_s)
-                  rescue
-                    show_value_for_xls(issue.custom_value_for(c.custom_field))
-                  end
-                when "date"
-                  begin
-                    Date.parse(issue.custom_value_for(c.custom_field).to_s)
-                  rescue
-                    show_value_for_xls(issue.custom_value_for(c.custom_field))
-                  end
-                else
-                  value = issue.custom_field_values.detect {|v| v.custom_field == c.custom_field}
-                  show_value_for_xls(value) unless value.nil?
-              end
-            else
-              case c.name
-                when :done_ratio
-                  (Float(issue.send(c.name)))/100
-                when :description
-                  descr_str = ''
-                  strip_html(issue.description, options).to_s.each_char do |c_a|
-                    if c_a != "\r"
-                      descr_str << c_a
-                    end
-                  end
-                  descr_str
-                when :relations
-                  rel_str = ''
-                  relations = issue.relations.select {|r| r.other_issue(issue).visible?}
-                  relations.each do |relation|
-                    rel_str << l(relation.label_for(issue)) << ' '
-                    rel_str << relation.other_issue(issue).tracker.to_s << ' #'
-                    rel_str << relation.other_issue(issue).id.to_s
-                    rel_str << "\n" unless relation == relations.last
-                  end unless relations.empty?
-                  rel_str
-                when :watcher
-                  rel_str=''
-                  if(User.current.allowed_to?(:view_issue_watchers, last_prj) && !issue.watcher_users.empty?)
-                    rel_str = issue.watcher_users.collect(&:to_s).join("\n")
-                    #issue.watcher_users.each do |user|
-                    #  rel_str << user.to_s
-                    #  rel_str << "\n" unless user == issue.watcher_users.last
-                    #end
-                  end
-                  rel_str
-                when :spent_time
-                  if User.current.allowed_to?(:view_time_entries, last_prj)
-                    c.value(issue)
-                  else
-                    ''
-                  end
-                when :attachments
-                  c.value(issue).to_a.map {|a| a.filename}.join("\n")
-                when :journal
-                  c.value(issue, options)
-                when :project
-                  last_prj = issue.send(c.name)
-                  last_prj
-                when :created_on, :updated_on, :closed_on
-                  datetime = issue.respond_to?(c.name) ? issue.send(c.name) : c.value(issue)
-                  localtime(datetime)
-                when :"parent.subject"
-                  issue.parent.nil? ? "" : issue.parent.subject
+        def has_id?(query)
+          has_in_query?(query, :id)
+        end
+
+        def has_description?(query)
+          has_in_query?(query, :description)
+        end
+
+        def has_spent_time?(query)
+          has_in_query?(query, :description)
+        end
+
+        def use_export_description_setting?(query, options)
+          if has_description?(query) == false && options[:description] == '1'
+            return true
+          end
+          false
+        end
+
+        def use_export_spent_time?(query, options)
+          if has_spent_time?(query) == false && options[:time] == '1'
+            return true
+          end
+          false
+        end
+
+        def init_row(row, query, first)
+          if has_id?(query)
+            row.replace []
+          else
+            row.replace [first]
+          end
+        end
+
+        def insert_issue_id(row, issue)
+          issue_url = url_for(:controller => 'issues', :action => 'show', :id => issue)
+          row << Spreadsheet::Link.new(URI.escape(issue_url), issue.id.to_s)
+          format_link = Spreadsheet::Format.new :color => :blue, :underline => :single
+          row.set_format(row.size - 1, format_link)
+        end
+
+        def create_issue_columns(project, query, options)
+          issue_columns = []
+
+          (options[:query_columns_only] == '1' ? query.columns : query.available_columns).each do |c|
+            case c.name
+              when :relations
+                issue_columns << c if options[:relations] == '1'
+              when :estimated_hours
+                issue_columns << XLS_SpentTimeQueryColumn.new(:spent_time) if use_export_spent_time?(query, options)
+                issue_columns << c if column_exists_for_project?(c, project)
               else
-                issue.respond_to?(c.name) ? issue.send(c.name) : c.value(issue)
+                issue_columns << c if column_exists_for_project?(c, project)
+            end
+          end
+
+          issue_columns << QueryColumn.new(:watcher) if options[:watchers] == '1'
+          issue_columns << XLS_AttachmentQueryColumn.new(:attachments) if options[:attachments] == '1'
+          issue_columns << XLS_JournalQueryColumn.new(:journal) if options[:journal] == '1'
+          issue_columns << QueryColumn.new(:description) if use_export_description_setting?(query, options)
+          issue_columns
+        end
+
+        def localtime(datetime)
+          if datetime
+            User.current.time_zone ? datetime.in_time_zone(User.current.time_zone) : datetime.localtime
+          end
+        end
+
+        def issues_to_xls2(issues, project, query, options = {})
+          Spreadsheet.client_encoding = 'UTF-8'
+
+          date_formats = init_date_formats(options)
+
+          group_by_query = query.grouped? ? options[:group] : false
+          book = Spreadsheet::Workbook.new
+          issue_columns = create_issue_columns(project, query, options)
+
+          sheet1 = nil
+          group = false
+          columns_width = []
+          idx = 0
+
+          issues.each do |issue|
+            if group_by_query == '1'
+              new_group = query_get_group_column_name(issue,query)
+              if new_group != group
+                group = new_group
+                update_sheet_formatting(sheet1,columns_width) if sheet1
+                sheet1 = book.create_worksheet(:name => (group.blank? ? l(:label_none) : pretty_xls_tab_name(group.to_s)))
+                columns_width = init_header_columns(query, sheet1, issue_columns, date_formats)
+                idx = 0
+              end
+            else
+              if sheet1 == nil
+                sheet1 = book.create_worksheet(:name => l(:label_issue_plural))
+                columns_width = init_header_columns(query, sheet1, issue_columns, date_formats)
               end
             end
 
-            value = %w(Time Date Fixnum Float Integer String).include?(v.class.name) ? v : v.to_s
+            row = sheet1.row(idx+1)
+            init_row(row, query, issue.id)
 
-            lf_pos = get_value_width(value)
-            index = has_id?(query) ? j : j + 1
-            columns_width[index] = lf_pos unless columns_width[index] >= lf_pos
-            if c.name == :id
-              insert_issue_id(row, issue)
-            else
-              row << value
+            lf_pos = get_value_width(issue.id)
+            columns_width[0] = lf_pos unless columns_width[0] >= lf_pos
+
+            last_prj = project
+
+            issue_columns.each_with_index do |c, j|
+              v = if c.is_a?(QueryCustomFieldColumn)
+                case c.custom_field.field_format
+                  when "int"
+                    begin
+                      Integer(issue.custom_value_for(c.custom_field).to_s)
+                    rescue
+                      show_value_for_xls(issue.custom_value_for(c.custom_field))
+                    end
+                  when "float"
+                    begin
+                      Float(issue.custom_value_for(c.custom_field).to_s)
+                    rescue
+                      show_value_for_xls(issue.custom_value_for(c.custom_field))
+                    end
+                  when "date"
+                    begin
+                      Date.parse(issue.custom_value_for(c.custom_field).to_s)
+                    rescue
+                      show_value_for_xls(issue.custom_value_for(c.custom_field))
+                    end
+                  else
+                    value = issue.custom_field_values.detect {|v| v.custom_field == c.custom_field}
+                    show_value_for_xls(value) unless value.nil?
+                end
+              else
+                case c.name
+                  when :done_ratio
+                    (Float(issue.send(c.name)))/100
+                  when :description
+                    descr_str = ''
+                    strip_html(issue.description, options).to_s.each_char do |c_a|
+                      if c_a != "\r"
+                        descr_str << c_a
+                      end
+                    end
+                    descr_str
+                  when :relations
+                    rel_str = ''
+                    relations = issue.relations.select {|r| r.other_issue(issue).visible?}
+                    relations.each do |relation|
+                      rel_str << l(relation.label_for(issue)) << ' '
+                      rel_str << relation.other_issue(issue).tracker.to_s << ' #'
+                      rel_str << relation.other_issue(issue).id.to_s
+                      rel_str << "\n" unless relation == relations.last
+                    end unless relations.empty?
+                    rel_str
+                  when :watcher
+                    rel_str=''
+                    if(User.current.allowed_to?(:view_issue_watchers, last_prj) && !issue.watcher_users.empty?)
+                      rel_str = issue.watcher_users.collect(&:to_s).join("\n")
+                    end
+                    rel_str
+                  when :spent_time
+                    if User.current.allowed_to?(:view_time_entries, last_prj)
+                      c.value(issue)
+                    else
+                      ''
+                    end
+                  when :attachments
+                    c.value(issue).to_a.map {|a| a.filename}.join("\n")
+                  when :journal
+                    c.value(issue, options)
+                  when :project
+                    last_prj = issue.send(c.name)
+                    last_prj
+                  when :created_on, :updated_on, :closed_on
+                    datetime = issue.respond_to?(c.name) ? issue.send(c.name) : c.value(issue)
+                    localtime(datetime)
+                  when :"parent.subject"
+                    issue.parent.nil? ? "" : issue.parent.subject
+                  else
+                    issue.respond_to?(c.name) ? issue.send(c.name) : c.value(issue)
+                end
+              end
+
+              value = %w(Time Date Fixnum Float Integer String).include?(v.class.name) ? v : v.to_s
+
+              lf_pos = get_value_width(value)
+              index = has_id?(query) ? j : j + 1
+              columns_width[index] = lf_pos unless columns_width[index] >= lf_pos
+              if c.name == :id
+                insert_issue_id(row, issue)
+              else
+                row << value
+              end
+            end
+
+            idx = idx + 1
+
+            if options[:journal_worksheets]
+              journal_details_to_xls(issue, options, book)
             end
           end
 
-          idx = idx + 1
-
-          if options[:journal_worksheets]
-              journal_details_to_xls(issue, options, book)
+          if sheet1
+            update_sheet_formatting(sheet1,columns_width)
+          else
+            sheet1 = book.create_worksheet(:name => 'Issues')
+            sheet1.row(0).replace [l(:label_no_data)]
           end
-          
+
+          xls_stream = StringIO.new('')
+          book.write(xls_stream)
+          xls_stream.string
         end
 
-        if sheet1
+        def journal_details_to_xls(issue, options, book_to_add = nil)
+          journals = get_visible_journals(issue)
+          return nil if journals.size == 0
+
+          Spreadsheet.client_encoding = 'UTF-8'
+          book = book_to_add ? book_to_add : Spreadsheet::Workbook.new
+          sheet1 = book.create_worksheet(:name => "%05i - Journal" % [issue.id])
+
+          columns_width = []
+          sheet1.row(0).replace []
+          ['#',l(:field_updated_on),l(:field_user),l(:label_details),l(:field_notes)].each do |c|
+            sheet1.row(0) << c
+            columns_width << (get_value_width(c)*1.1)
+          end
+          sheet1.column(0).default_format = Spreadsheet::Format.new(:number_format => "0")
+
+          idx=0
+          journals.each do |journal|
+            row = sheet1.row(idx+1)
+            row.replace []
+
+            details=''
+            journal.visible_details.each do |detail|
+              details <<  "#{show_detail(detail, true)}"
+              details << "\n" unless detail == journal.visible_details.last
+            end
+            details = strip_html(details, options)
+            notes = strip_html(journal.notes? ? journal.notes.to_s : '', options)
+
+            [idx+1,localtime(journal.created_on),journal.user.name,details,notes].each_with_index do |e,e_idx|
+              lf_pos = get_value_width(e)
+              columns_width[e_idx] = lf_pos unless columns_width[e_idx] >= lf_pos
+              row << e
+            end
+
+            idx=idx+1
+          end
+
           update_sheet_formatting(sheet1,columns_width)
-        else
-          sheet1 = book.create_worksheet(:name => 'Issues')
-          sheet1.row(0).replace [l(:label_no_data)]
-        end
 
-        xls_stream = StringIO.new('')
-        book.write(xls_stream)
-
-        return xls_stream.string
-      end
-
-      def journal_details_to_xls(issue, options, book_to_add = nil)
-        journals = get_visible_journals(issue)
-        return nil if journals.size == 0
-
-        Spreadsheet.client_encoding = 'UTF-8'
-        book = book_to_add ? book_to_add : Spreadsheet::Workbook.new
-        sheet1 = book.create_worksheet(:name => "%05i - Journal" % [issue.id])
-
-        columns_width = []
-        sheet1.row(0).replace []
-        ['#',l(:field_updated_on),l(:field_user),l(:label_details),l(:field_notes)].each do |c|
-          sheet1.row(0) << c
-          columns_width << (get_value_width(c)*1.1)
-        end
-        sheet1.column(0).default_format = Spreadsheet::Format.new(:number_format => "0")
-
-        idx=0
-        journals.each do |journal|
-          row = sheet1.row(idx+1)
-          row.replace []
-
-          details=''
-          journal.visible_details.each do |detail|
-            details <<  "#{show_detail(detail, true)}"
-            details << "\n" unless detail == journal.visible_details.last
-          end
-          details = strip_html(details, options)
-          notes = strip_html(journal.notes? ? journal.notes.to_s : '', options)
-
-          [idx+1,localtime(journal.created_on),journal.user.name,details,notes].each_with_index do |e,e_idx|
-            lf_pos = get_value_width(e)
-            columns_width[e_idx] = lf_pos unless columns_width[e_idx] >= lf_pos
-            row << e
-          end
-
-          idx=idx+1
-        end
-
-        update_sheet_formatting(sheet1,columns_width)
-
-        if book_to_add.nil?
+          if book_to_add.nil?
             xls_stream = StringIO.new('')
             book.write(xls_stream)
             xls_stream.string
@@ -635,5 +612,4 @@ module Redmine
     end # Final del módulo XLS
   end # Final del módulo Export
 end # Final del módulo Redmine
-end # Final del módulo XlsExport
 end # Final del módulo XlsExport
