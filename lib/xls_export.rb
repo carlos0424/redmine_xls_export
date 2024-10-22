@@ -38,7 +38,7 @@ module XlsExport
 
         class XLS_QueryColumn
           attr_accessor :name, :sortable, :groupable, :default_order
-          include Redmine::I18n
+          include I18n
 
           def initialize(name, options={})
             self.name = name
@@ -52,7 +52,7 @@ module XlsExport
           end
 
           def caption
-            l(@caption_key)
+            I18n.t(@caption_key)
           end
 
           def sortable?
