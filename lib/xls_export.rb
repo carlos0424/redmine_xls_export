@@ -106,8 +106,6 @@ module XlsExport
         end
         
         class XLS_AttachmentQueryColumn < XLS_QueryColumn
-          include Redmine::I18n  # Aseguramos que el método `l` esté disponible
-        
           def caption
             l(:label_plugin_xlse_field_attachment)
           end
@@ -116,7 +114,6 @@ module XlsExport
             issue.attachments.to_a.map { |a| a.filename }.join("\n")
           end
         end
-        
         
         
         
@@ -237,43 +234,28 @@ module XlsExport
         idx = 0
       
         issues.each do |issue|
-          # Si está agrupado por una columna
           if group_by_query == '1'
             new_group = query_get_group_column_name(issue, query)
             if new_group != group
               group = new_group
-              # Actualiza el formato de la hoja anterior
               update_sheet_formatting(sheet1, columns_width) if sheet1
-              # Crea una nueva hoja para el nuevo grupo
               sheet1 = book.create_worksheet(:name => (group.blank? ? l(:label_none) : pretty_xls_tab_name(group.to_s)))
-              # Inicializa los encabezados de las columnas
               columns_width = init_header_columns(query, sheet1, issue_columns, date_formats)
               idx = 0
             end
           else
-            # Si no está agrupado, solo crea la hoja y columnas si es la primera vez
-            unless sheet1
-              sheet1 = book.create_worksheet(:name => l(:label_issue_plural))
-              columns_width = init_header_columns(query, sheet1, issue_columns, date_formats)
-            end
+            sheet1 ||= book.create_worksheet(:name => l(:label_issue_plural))
+            columns_width ||= init_header_columns(query, sheet1, issue_columns, date_formats)
           end
       
-          # Siempre asegúrate de que la primera fila tenga los títulos si no están presentes
-          if sheet1.row(0).empty?
-            columns_width = init_header_columns(query, sheet1, issue_columns, date_formats)
-          end
-      
-          # Agrega los datos del issue en una nueva fila
           row = sheet1.row(idx + 1)
           init_row(row, query, issue.id)
       
-          # Ajusta el ancho de la primera columna
           lf_pos = get_value_width(issue.id)
           columns_width[0] = lf_pos if columns_width[0].nil? || columns_width[0] < lf_pos
       
           last_prj = project
       
-          # Recorre todas las columnas y extrae los valores correspondientes
           issue_columns.each_with_index do |c, j|
             v = if c.is_a?(QueryCustomFieldColumn)
                   case c.custom_field.field_format
@@ -329,39 +311,30 @@ module XlsExport
                   end
                 end
       
-            # Convierte el valor para ser compatible con XLS
             value = %w(Time Date Fixnum Float Integer String).include?(v.class.name) ? v : v.to_s
       
-            # Ajusta el ancho de las columnas
             lf_pos = get_value_width(value)
             index = has_id?(query) ? j : j + 1
             columns_width[index] = lf_pos if columns_width[index].nil? || columns_width[index] < lf_pos
-      
-            # Inserta el valor en la fila
             c.name == :id ? insert_issue_id(row, issue) : row << value
           end
       
           idx += 1
       
-          # Exporta los detalles del journal si se ha configurado
           journal_details_to_xls(issue, options, book) if options[:journal_worksheets]
         end
       
-        # Si hay al menos una hoja, actualiza el formato
         if sheet1
           update_sheet_formatting(sheet1, columns_width)
         else
-          # Si no hay datos, crea una hoja vacía con el mensaje correspondiente
           sheet1 = book.create_worksheet(:name => 'Issues')
           sheet1.row(0).replace [l(:label_no_data)]
         end
       
-        # Genera el archivo XLS en un flujo de memoria
         xls_stream = StringIO.new('')
         book.write(xls_stream)
         xls_stream.string
       end
-      
       
 
         def journal_details_to_xls(issue, options, book_to_add = nil)
