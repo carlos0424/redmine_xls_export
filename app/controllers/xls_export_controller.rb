@@ -1,6 +1,7 @@
 require File.expand_path('../../../lib/xlse_asset_helpers', __FILE__)
 
-require_dependency 'xls_export'
+require_dependency File.expand_path('../../../lib/xls_export', __FILE__)
+
 begin
   require 'zip/zip'
 rescue LoadError
