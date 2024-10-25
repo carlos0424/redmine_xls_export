@@ -398,49 +398,77 @@ module XlsExport
         return false
       end
 
-      def init_header_columns(query, sheet1, columns, date_formats)
-        columns_width = has_id?(query) ? [] : [1]
-        init_row(sheet1.row(0), query, "#") # Asegura que el número de fila sea 0 para la cabecera
-      
-        columns.each do |c|
-          sheet1.row(0) << c.caption # Agrega los títulos de las columnas
-          columns_width << (get_value_width(c.caption) * 1.1) # Calcula el ancho de cada columna basado en el título
-        end
-      
-        # Formato de la columna de ID
-        sheet1.column(0).default_format = Spreadsheet::Format.new(:number_format => "0")
-      
-        # Aplica formatos adicionales según el tipo de campo
-        opt = {}
-        columns.each_with_index do |c, idx|
-          width = 0
-          opt.clear
-      
-          if c.is_a?(QueryCustomFieldColumn)
-            case c.custom_field.field_format
-            when "int"
-              opt[:number_format] = "0"
-            when "float"
-              opt[:number_format] = "0.00"
-            end
-          else
-            case c.name
-            when :done_ratio
-              opt[:number_format] = '0%'
-            when :estimated_hours, :spent_time
-              opt[:number_format] = "0.0"
-            when :created_on, :updated_on, :start_date, :due_date, :closed_on
-              opt[:number_format] = date_formats[c.name]
-            end
-          end
-      
-          sheet1.column(idx).default_format = Spreadsheet::Format.new(opt) unless opt.empty?
-          columns_width[idx] = width unless columns_width[idx] >= width
-        end
-      
-        columns_width
+# Reemplaza solo el método init_header_columns con esta versión:
+def init_header_columns(query, sheet1, columns, date_formats)
+  columns_width = has_id?(query) ? [] : [1]
+  init_row(sheet1.row(0), query, "#")
+  
+  # Formato base para la cabecera
+  header_format = Spreadsheet::Format.new(
+    :weight => :bold,
+    :pattern => 1,
+    :pattern_bg_color => :gray,
+    :pattern_fg_color => :gray,
+    :font => { :color => :white }
+  )
+
+  # Aplicar el formato a toda la fila de cabecera
+  sheet1.row(0).default_format = header_format
+  
+  # Agregar los títulos de las columnas
+  columns.each do |c|
+    title = case
+    when c.is_a?(QueryCustomFieldColumn)
+      c.custom_field.name
+    when c.respond_to?(:caption)
+      c.caption.is_a?(Symbol) ? l(c.caption) : c.caption
+    else
+      l("field_#{c.name}", :default => c.name.to_s.humanize)
+    end
+
+    # Asegurarse que el título no sea nil y convertirlo a string
+    title = title.presence || c.name.to_s.humanize
+    
+    # Agregar el título a la hoja
+    sheet1.row(0) << title.to_s
+    
+    columns_width << (get_value_width(title) * 1.1)
+  end
+
+  # Formato para la columna ID
+  sheet1.column(0).default_format = Spreadsheet::Format.new(:number_format => "0")
+  
+  # Formatos específicos para columnas
+  columns.each_with_index do |c, idx|
+    format = case
+    when c.is_a?(QueryCustomFieldColumn)
+      case c.custom_field.field_format
+      when "int" then {:number_format => "0"}
+      when "float" then {:number_format => "0.00"}
+      when "date" then {:number_format => date_formats[:start_date]}
       end
-      
+    when [:done_ratio].include?(c.name)
+      {:number_format => "0%"}
+    when [:estimated_hours, :spent_time].include?(c.name)
+      {:number_format => "0.0"}
+    when [:created_on, :updated_on, :start_date, :due_date, :closed_on].include?(c.name)
+      {:number_format => date_formats[c.name]}
+    end
+
+    sheet1.column(idx).default_format = Spreadsheet::Format.new(format) if format
+  end
+
+  # Asegurar que los títulos sean visibles
+  sheet1.row(0).height = 20
+  
+  # Reajustar el ancho de las columnas según el contenido
+  columns.each_with_index do |_, idx|
+    width = columns_width[idx] || 10
+    sheet1.column(idx).width = [width, 60].min
+  end
+
+  columns_width
+end
 
       def update_sheet_formatting(sheet1,columns_width)
 
