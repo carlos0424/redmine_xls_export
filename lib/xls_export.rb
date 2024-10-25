@@ -402,7 +402,7 @@ end
 
       def init_header_columns(query, sheet1, columns, date_formats)
         columns_width = has_id?(query) ? [] : [1]
-        init_row(sheet1.row(0), query, "#")
+        sheet1.row(0).replace []  # Asegurarse de limpiar la fila 0 antes de agregar los títulos.
         
         columns.each do |c|
           caption = if c.is_a?(QueryCustomFieldColumn)
@@ -411,39 +411,15 @@ end
             c.respond_to?(:caption) ? c.caption : l("field_#{c.name}")
           end
           
-          # Depuración: Verificamos que el título se esté generando
-          puts "Generando título de columna: #{caption}"
-      
-          sheet1.row(0) << caption
-          sheet1.row(0).default_format = Spreadsheet::Format.new(:weight => :bold, :color => :black)
-
-          columns_width << (get_value_width(caption) * 1.1)
+          puts "Generando título de columna: #{caption}"  # Para depuración, verifica en el log si los títulos se están generando
+          
+          sheet1.row(0) << caption  # Forzar la inclusión de cada título
         end
-        sheet1.column(0).default_format = Spreadsheet::Format.new(:number_format => "0")
         
-        # Aplicar formatos de columnas
-        columns.each_with_index do |c, idx|
-          opt = {}
-          if c.is_a?(QueryCustomFieldColumn)
-            opt[:number_format] = case c.custom_field.field_format
-              when "int" then "0"
-              when "float" then "0.00"
-              when "date" then date_formats[:start_date]
-            end
-          else
-            opt[:number_format] = case c.name
-              when :done_ratio then "0%"
-              when :estimated_hours, :spent_time then "0.0"
-              when :created_on, :updated_on, :start_date, :due_date, :closed_on
-                date_formats[c.name]
-            end
-          end
-          sheet1.column(idx).default_format = Spreadsheet::Format.new(opt) unless opt.empty?
-        end
+        sheet1.column(0).default_format = Spreadsheet::Format.new(:number_format => "0")
         
         columns_width
       end
-       
 
 def update_sheet_formatting(sheet1, columns_width)
   sheet1.row(0).count.times do |idx|
