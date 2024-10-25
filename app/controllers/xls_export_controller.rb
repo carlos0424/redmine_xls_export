@@ -28,8 +28,9 @@ class XlsExportController < ApplicationController
   include QueriesHelper
   helper :issues
   include IssuesHelper
-  include XlsExport::Redmine::Export::XLS  # Incluye el módulo principal XLS
-  include XlsExport::Redmine::Export::XLS::StripHTML  # Incluye el módulo que define strip_html
+  include XlsExport::Redmine::Export::XLS  # Incluye el módulo principal
+  include XlsExport::Redmine::Export::XLS::Journals  # Incluye el módulo de Journals
+  include XlsExport::Redmine::Export::XLS::StripHTML  # Incluye el módulo de StripHTML
   helper :custom_fields
   include CustomFieldsHelper
 
