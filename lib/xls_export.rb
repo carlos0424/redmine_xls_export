@@ -52,12 +52,11 @@ module XlsExport
           end
 
           def caption
-            if @caption_key.is_a?(Symbol)
-              ::I18n.t(@caption_key.to_s, default: @caption_key.to_s.humanize)
-            else
-              ::I18n.t(@caption_key, default: @caption_key.to_s.humanize)
-            end
+            return ::I18n.t(@caption_key) if @caption_key.is_a?(Symbol)
+            return ::I18n.t("field_#{name}") if @caption_key.start_with?("field_")
+            ::I18n.t(@caption_key, default: name.to_s.humanize)
           end
+        end
           def sortable?
             !@sortable.nil?
           end
@@ -195,30 +194,45 @@ module XlsExport
 
         def create_issue_columns(project, query, options)
           issue_columns = []
-        
-          (options[:query_columns_only] == '1' ? query.columns : query.available_columns).each do |c|
+          
+          columns_to_include = options[:query_columns_only] == '1' ? query.columns : query.available_columns
+          
+          columns_to_include.each do |c|
             case c.name
-              when :relations
-                issue_columns << c if options[:relations] == '1'
-              when :estimated_hours
-                issue_columns << XLS_SpentTimeQueryColumn.new(:spent_time) if use_export_spent_time?(query, options)
-                issue_columns << c if column_exists_for_project?(c, project)
-              else
-                issue_columns << c if column_exists_for_project?(c, project)
+            when :relations
+              issue_columns << c if options[:relations] == '1'
+            when :estimated_hours
+              if use_export_spent_time?(query, options)
+                spent_time_column = XLS_QueryColumn.new(:spent_time, {
+                  caption: ::I18n.t(:label_spent_time),
+                  sortable: "#{TimeEntry.table_name}.hours",
+                })
+                issue_columns << spent_time_column
+              end
+              issue_columns << c if column_exists_for_project?(c, project)
+            else
+              issue_columns << c if column_exists_for_project?(c, project)
             end
           end
-        
-          issue_columns << QueryColumn.new(:watcher) if options[:watchers] == '1'
+          
+          if options[:watchers] == '1'
+            issue_columns << XLS_QueryColumn.new(:watcher, {
+              caption: ::I18n.t(:field_watcher),
+              sortable: false
+            })
+          end
+          
           issue_columns << XLS_AttachmentQueryColumn.new(:attachments) if options[:attachments] == '1'
           issue_columns << XLS_JournalQueryColumn.new(:journal) if options[:journal] == '1'
-          issue_columns << QueryColumn.new(:description) if use_export_description_setting?(query, options)
-          issue_columns
-        end
-
-        def localtime(datetime)
-          if datetime
-            User.current.time_zone ? datetime.in_time_zone(User.current.time_zone) : datetime.localtime
+          
+          if use_export_description_setting?(query, options)
+            issue_columns << XLS_QueryColumn.new(:description, {
+              caption: ::I18n.t(:field_description),
+              sortable: false
+            })
           end
+          
+          issue_columns
         end
 
         def issues_to_xls2(issues, project, query, options = {})
@@ -403,62 +417,68 @@ end
       def init_header_columns(query, sheet1, columns, date_formats)
         columns_width = has_id?(query) ? [] : [1]
         init_row(sheet1.row(0), query, "#")
-      
+        
+        # Agregar las columnas y sus títulos
         columns.each do |c|
-          caption = case 
+          header_text = case
             when c.is_a?(QueryCustomFieldColumn)
-              c.custom_field.name
-            when c.is_a?(XLS_QueryColumn)
-              c.caption
-            when c.respond_to?(:caption)
-              c.caption
+              c.caption || c.custom_field.name
+            when c.is_a?(XLS_QueryColumn) || c.respond_to?(:caption)
+              ::I18n.t("field_#{c.name}", default: c.caption || c.name.to_s.humanize)
             else
-              l("field_#{c.name}", default: c.name.to_s.humanize)
+              ::I18n.t("field_#{c.name}", default: c.name.to_s.humanize)
           end
-      
-          sheet1.row(0) << caption.to_s
-          columns_width << (get_value_width(caption) * 1.1)
+          
+          sheet1.row(0) << header_text.to_s
+          columns_width << (get_value_width(header_text) * 1.1)
         end
-      
-        # Formato de la columna ID
+        
+        # Formato para números
         sheet1.column(0).default_format = Spreadsheet::Format.new(:number_format => "0")
-      
-        # Formato especial para la cabecera
+        
+        # Formato para la cabecera
         header_format = Spreadsheet::Format.new(
           :weight => :bold,
           :pattern => 1,
-          :pattern_bg_color => :gray,
           :pattern_fg_color => :gray,
+          :pattern_bg_color => :gray,
           :font => { :color => :white },
-          :align => :center
+          :align => :center,
+          :text_wrap => true
         )
-      
+        
+        # Aplicar formato a cada celda de la cabecera
         sheet1.row(0).count.times do |i|
           sheet1.row(0).set_format(i, header_format)
         end
-      
-
+        
+        # Configurar formato para cada tipo de columna
         columns.each_with_index do |c, idx|
-          format = case
-            when c.is_a?(QueryCustomFieldColumn)
-              case c.custom_field.field_format
-                when "int" then { :number_format => "0" }
-                when "float" then { :number_format => "0.00" }
-                when "date" then { :number_format => date_formats[:start_date] }
-              end
-            when [:done_ratio].include?(c.name)
-              { :number_format => "0%" }
-            when [:estimated_hours, :spent_time].include?(c.name)
-              { :number_format => "0.0" }
-            when [:created_on, :updated_on, :start_date, :due_date, :closed_on].include?(c.name)
-              { :number_format => date_formats[c.name] }
+          column_format = {}
+          
+          if c.is_a?(QueryCustomFieldColumn)
+            column_format[:number_format] = case c.custom_field.field_format
+              when "int" then "0"
+              when "float" then "0.00"
+              when "date" then date_formats[:start_date]
+            end
+          else
+            column_format[:number_format] = case c.name
+              when :done_ratio then "0%"
+              when :estimated_hours, :spent_time then "0.0"
+              when :created_on, :updated_on, :start_date, :due_date, :closed_on
+                date_formats[c.name]
+            end
           end
-      
-          sheet1.column(idx).default_format = Spreadsheet::Format.new(format) if format
+          
+          if column_format.present?
+            sheet1.column(idx).default_format = Spreadsheet::Format.new(column_format)
+          end
         end
-      
+        
         columns_width
       end
+
 def update_sheet_formatting(sheet1, columns_width)
   sheet1.row(0).count.times do |idx|
     do_wrap = columns_width[idx] > 60 ? 1 : 0
