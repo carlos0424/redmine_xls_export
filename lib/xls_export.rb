@@ -235,169 +235,135 @@ module XlsExport
   columns_width = []
   idx = 0
   
-  # xls rows
-        issues.each do |issue|
-          if group_by_query == '1'
-            new_group=query_get_group_column_name(issue,query)
-            if new_group != group
-              group = new_group
-              update_sheet_formatting(sheet1,columns_width) if sheet1
-              sheet1 = book.create_worksheet(:name => (group.blank? ? l(:label_none) : pretty_xls_tab_name(group.to_s)))
-              columns_width=init_header_columns(query, sheet1,issue_columns,date_formats)
-              idx = 0
+  issues.each do |issue|
+    if group_by_query == '1'
+      new_group = query_get_group_column_name(issue, query)
+      if new_group != group
+        group = new_group
+        update_sheet_formatting(sheet1, columns_width) if sheet1
+        sheet1 = book.create_worksheet(:name => (group.blank? ? l(:label_none) : pretty_xls_tab_name(group.to_s)))
+        columns_width = init_header_columns(query, sheet1, issue_columns, date_formats)
+        idx = 0
+      end
+    else
+      sheet1 ||= book.create_worksheet(:name => l(:label_issue_plural))
+      columns_width ||= init_header_columns(query, sheet1, issue_columns, date_formats)
+    end
+    
+    row = sheet1.row(idx + 1)
+    init_row(row, query, issue.id)
+    
+    lf_pos = get_value_width(issue.id)
+    columns_width[0] = lf_pos if columns_width[0].nil? || columns_width[0] < lf_pos
+    
+    last_prj = project
+    
+    issue_columns.each_with_index do |c, j|
+      v = if c.is_a?(QueryCustomFieldColumn)
+            case c.custom_field.field_format
+            when "int"
+              begin
+                Integer(issue.custom_value_for(c.custom_field).to_s)
+              rescue
+                show_value_for_xls(issue.custom_value_for(c.custom_field))
+              end
+            when "float"
+              begin
+                Float(issue.custom_value_for(c.custom_field).to_s)
+              rescue
+                show_value_for_xls(issue.custom_value_for(c.custom_field))
+              end
+            when "date"
+              begin
+                Date.parse(issue.custom_value_for(c.custom_field).to_s)
+              rescue
+                show_value_for_xls(issue.custom_value_for(c.custom_field))
+              end
+            else
+              value = issue.custom_field_values.detect { |v| v.custom_field == c.custom_field }
+              show_value_for_xls(value) unless value.nil?
             end
           else
-            if sheet1 == nil
-              sheet1 = book.create_worksheet(:name => l(:label_issue_plural))
-              columns_width=init_header_columns(query, sheet1,issue_columns,date_formats)
-            end
-          end
-
-          row = sheet1.row(idx+1)
-          init_row(row, query, issue.id)
-
-          lf_pos = get_value_width(issue.id)
-          columns_width[0] = lf_pos unless columns_width[0] >= lf_pos
-
-          last_prj = project
-
-          issue_columns.each_with_index do |c, j|
-            v = if c.is_a?(QueryCustomFieldColumn)
-              case c.custom_field.field_format
-                when "int"
-                  begin
-                    Integer(issue.custom_value_for(c.custom_field).to_s)
-                  rescue
-                    show_value_for_xls(issue.custom_value_for(c.custom_field))
-                  end
-                when "float"
-                  begin
-                    Float(issue.custom_value_for(c.custom_field).to_s)
-                  rescue
-                    show_value_for_xls(issue.custom_value_for(c.custom_field))
-                  end
-                when "date"
-                  begin
-                    Date.parse(issue.custom_value_for(c.custom_field).to_s)
-                  rescue
-                    show_value_for_xls(issue.custom_value_for(c.custom_field))
-                  end
-                else
-                  value = issue.custom_field_values.detect {|v| v.custom_field == c.custom_field}
-                  show_value_for_xls(value) unless value.nil?
-              end
+            case c.name
+            when :done_ratio
+              (Float(issue.send(c.name))) / 100
+            when :description
+              strip_html(issue.description.to_s.gsub("\r", ""), options)
+            when :relations
+              relations = issue.relations.select { |r| r.other_issue(issue).visible? }
+              relations.map { |relation| "#{l(relation.label_for(issue))} #{relation.other_issue(issue).tracker} ##{relation.other_issue(issue).id}" }.join("\n")
+            when :watcher
+              issue.watcher_users.collect(&:to_s).join("\n") if User.current.allowed_to?(:view_issue_watchers, last_prj)
+            when :spent_time
+              c.value(issue) if User.current.allowed_to?(:view_time_entries, last_prj)
+            when :attachments
+              attachments = Array(c.value(issue)) # Asegura que sea un array
+              attachments.compact.select { |a| a.respond_to?(:filename) }.map { |a| a.filename }.join("\n")
+            when :journal
+              c.value(issue, options)
+            when :project
+              last_prj = issue.send(c.name)
+            when :created_on, :updated_on, :closed_on
+              datetime = issue.respond_to?(c.name) ? issue.send(c.name) : c.value(issue)
+              localtime(datetime)
+            when :"parent.subject"
+              issue.parent&.subject.to_s
             else
-              case c.name
-                when :done_ratio
-                  (Float(issue.send(c.name)))/100
-                when :description
-                  descr_str = ''
-                  strip_html(issue.description, options).to_s.each_char do |c_a|
-                    if c_a != "\r"
-                      descr_str << c_a
-                    end
-                  end
-                  descr_str
-                when :relations
-                  rel_str = ''
-                  relations = issue.relations.select {|r| r.other_issue(issue).visible?}
-                  relations.each do |relation|
-                    rel_str << l(relation.label_for(issue)) << ' '
-                    rel_str << relation.other_issue(issue).tracker.to_s << ' #'
-                    rel_str << relation.other_issue(issue).id.to_s
-                    rel_str << "\n" unless relation == relations.last
-                  end unless relations.empty?
-                  rel_str
-                when :watcher
-                  rel_str=''
-                  if(User.current.allowed_to?(:view_issue_watchers, last_prj) && !issue.watcher_users.empty?)
-                    rel_str = issue.watcher_users.collect(&:to_s).join("\n")
-                    #issue.watcher_users.each do |user|
-                    #  rel_str << user.to_s
-                    #  rel_str << "\n" unless user == issue.watcher_users.last
-                    #end
-                  end
-                  rel_str
-                when :spent_time
-                  if User.current.allowed_to?(:view_time_entries, last_prj)
-                    c.value(issue)
-                  else
-                    ''
-                  end
-                when :attachments
-                  c.value(issue).to_a.map {|a| a.filename}.join("\n")
-                when :journal
-                  c.value(issue, options)
-                when :project
-                  last_prj = issue.send(c.name)
-                  last_prj
-                when :created_on, :updated_on, :closed_on
-                  datetime = issue.respond_to?(c.name) ? issue.send(c.name) : c.value(issue)
-                  localtime(datetime)
-              else
-                issue.respond_to?(c.name) ? issue.send(c.name) : c.value(issue)
-              end
-            end
-
-            value = %w(Time Date Fixnum Float Integer String).include?(v.class.name) ? v : v.to_s
-
-            lf_pos = get_value_width(value)
-            index = has_id?(query) ? j : j + 1
-            columns_width[index] = lf_pos unless columns_width[index] >= lf_pos
-            if c.name == :id
-              insert_issue_id(row, issue)
-            else
-              row << value
+              issue.respond_to?(c.name) ? issue.send(c.name) : c.value(issue)
             end
           end
+      
+      value = %w(Time Date Fixnum Float Integer String).include?(v.class.name) ? v : v.to_s
+      
+      lf_pos = get_value_width(value)
+      index = has_id?(query) ? j : j + 1
+      columns_width[index] = lf_pos if columns_width[index].nil? || columns_width[index] < lf_pos
+      c.name == :id ? insert_issue_id(row, issue) : row << value
+    end
+    
+    idx += 1
+    
+    journal_details_to_xls(issue, options, book) if options[:journal_worksheets]
+  end
+  
+  if sheet1
+    update_sheet_formatting(sheet1, columns_width)
+  else
+    sheet1 = book.create_worksheet(:name => 'Issues')
+    sheet1.row(0).replace [l(:label_no_data)]
+  end
+  
+  xls_stream = StringIO.new('')
+  book.write(xls_stream)
+  xls_stream.string
+end
+      
 
-          idx = idx + 1
+        def journal_details_to_xls(issue, options, book_to_add = nil)
+          journals = get_visible_journals(issue)
+          return nil if journals.size == 0
 
-          if options[:journal_worksheets]
-              journal_details_to_xls(issue, options, book)
+          Spreadsheet.client_encoding = 'UTF-8'
+          book = book_to_add ? book_to_add : Spreadsheet::Workbook.new
+          sheet1 = book.create_worksheet(:name => "%05i - Journal" % [issue.id])
+
+          columns_width = []
+          sheet1.row(0).replace []
+          ['#',l(:field_updated_on),l(:field_user),l(:label_details),l(:field_notes)].each do |c|
+            sheet1.row(0) << c
+            columns_width << (get_value_width(c)*1.1)
           end
-          
-        end
+          sheet1.column(0).default_format = Spreadsheet::Format.new(:number_format => "0")
 
-        if sheet1
-          update_sheet_formatting(sheet1,columns_width)
-        else
-          sheet1 = book.create_worksheet(:name => 'Issues')
-          sheet1.row(0).replace [l(:label_no_data)]
-        end
-
-        xls_stream = StringIO.new('')
-        book.write(xls_stream)
-
-        return xls_stream.string
-      end
-
-      def journal_details_to_xls(issue, options, book_to_add = nil)
-        issue_updates = issue.journals.includes(:user, :details).order("#{Journal.table_name}.created_on ASC").to_a
-        return nil if issue_updates.size == 0
-
-        Spreadsheet.client_encoding = 'UTF-8'
-        book = book_to_add ? book_to_add : Spreadsheet::Workbook.new
-        sheet1 = book.create_worksheet(:name => "%05i - Journal" % [issue.id])
-
-        columns_width = []
-        sheet1.row(0).replace []
-        ['#',l(:field_updated_on),l(:field_user),l(:label_details),l(:field_notes)].each do |c|
-          sheet1.row(0) << c
-          columns_width << (get_value_width(c)*1.1)
-        end
-        sheet1.column(0).default_format = Spreadsheet::Format.new(:number_format => "0")
-
-        idx=0
-        issue_updates.each do |journal|
-          if !journal.private_notes? or User.current.allowed_to?(:view_private_notes, journal.project)
+          idx=0
+          journals.each do |journal|
             row = sheet1.row(idx+1)
             row.replace []
 
             details=''
-            journal.details.each do |detail|
+            journal.visible_details.each do |detail|
               details <<  "#{show_detail(detail, true)}"
-              details << "\n" unless detail == journal.details.last
+              details << "\n" unless detail == journal.visible_details.last
             end
             details = strip_html(details, options)
             notes = strip_html(journal.notes? ? journal.notes.to_s : '', options)
@@ -410,11 +376,10 @@ module XlsExport
 
             idx=idx+1
           end
-        end
 
-        update_sheet_formatting(sheet1,columns_width)
+          update_sheet_formatting(sheet1,columns_width)
 
-        if book_to_add.nil?
+          if book_to_add.nil?
             xls_stream = StringIO.new('')
             book.write(xls_stream)
             xls_stream.string
@@ -435,71 +400,69 @@ module XlsExport
         return false
       end
 
-      def init_header_columns(query, sheet1,columns,date_formats)
-
-        columns_width = has_id?(query) ? [] : [1]
-        init_row(sheet1.row(0), query, "#")
-
-        columns.each do |c|
-          sheet1.row(0) << c.caption
-          columns_width << (get_value_width(c.caption)*1.1)
-        end
-        # id
-        sheet1.column(0).default_format = Spreadsheet::Format.new(:number_format => "0")
-
-        opt = Hash.new
-        columns.each_with_index do |c, idx|
-          width = 0
-          opt.clear
-
-          if c.is_a?(QueryCustomFieldColumn)
-            case c.custom_field.field_format
-              when "int"
-                opt[:number_format] = "0"
-              when "float"
-                opt[:number_format] = "0.00"
-            end
-          else
-            case c.name
-              when :done_ratio
-                opt[:number_format] = '0%'
-              when :estimated_hours, :spent_time
-                opt[:number_format] = "0.0"
-              when :created_on, :updated_on, :start_date, :due_date, :closed_on
-                opt[:number_format] = date_formats[c.name]
-            end
-          end
-
-          sheet1.column(idx).default_format = Spreadsheet::Format.new(opt) unless opt.empty?
-          columns_width[idx] = width unless columns_width[idx] >= width
-        end
-
-        return columns_width
+ # Actualiza el método init_header_columns:
+ def init_header_columns(query, sheet1, columns, date_formats)
+  columns_width = has_id?(query) ? [] : [1]
+  init_row(sheet1.row(0), query, "#")
+  
+  columns.each do |c|
+    caption = if c.is_a?(QueryCustomFieldColumn)
+      c.caption || c.custom_field.name
+    else
+      c.respond_to?(:caption) ? c.caption : l("field_#{c.name}")
+    end
+    
+    sheet1.row(0) << caption
+    columns_width << (get_value_width(caption) * 1.1)
+  end
+  
+  sheet1.column(0).default_format = Spreadsheet::Format.new(:number_format => "0")
+  
+  columns.each_with_index do |c, idx|
+    format_options = {}
+    
+    if c.is_a?(QueryCustomFieldColumn)
+      format_options[:number_format] = case c.custom_field.field_format
+        when "int" then "0"
+        when "float" then "0.00"
+        when "date" then date_formats[:start_date]
       end
-
-      def update_sheet_formatting(sheet1,columns_width)
-
-        sheet1.row(0).count.times do |idx|
-
-            do_wrap = columns_width[idx] > 60 ? 1 : 0
-            sheet1.column(idx).width = columns_width[idx] > 60 ? 60 : columns_width[idx]
-
-            if do_wrap
-              fmt = Marshal::load(Marshal.dump(sheet1.column(idx).default_format))
-              fmt.text_wrap = true
-              sheet1.column(idx).default_format = fmt
-            end
-
-            fmt = Marshal::load(Marshal.dump(sheet1.row(0).format(idx)))
-            fmt.font.bold=true
-            fmt.pattern=1
-            fmt.pattern_bg_color=:gray
-            fmt.pattern_fg_color=:gray
-            fmt.font.color = :white
-            sheet1.row(0).set_format(idx,fmt)
-        end
-
+    else
+      format_options[:number_format] = case c.name
+        when :done_ratio then "0%"
+        when :estimated_hours, :spent_time then "0.0"
+        when :created_on, :updated_on, :start_date, :due_date, :closed_on
+          date_formats[c.name]
       end
+    end
+    
+    sheet1.column(idx).default_format = Spreadsheet::Format.new(format_options) if format_options.present?
+  end
+  
+  columns_width
+end
+      
+
+def update_sheet_formatting(sheet1, columns_width)
+  sheet1.row(0).count.times do |idx|
+    do_wrap = columns_width[idx] > 60 ? 1 : 0
+    sheet1.column(idx).width = columns_width[idx] > 60 ? 60 : columns_width[idx]
+    
+    if do_wrap
+      fmt = Marshal::load(Marshal.dump(sheet1.column(idx).default_format))
+      fmt.text_wrap = true
+      sheet1.column(idx).default_format = fmt
+    end
+    
+    fmt = Marshal::load(Marshal.dump(sheet1.row(0).format(idx)))
+    fmt.font.bold = true
+    fmt.pattern = 1
+    fmt.pattern_bg_color = :gray
+    fmt.pattern_fg_color = :gray
+    fmt.font.color = :white
+    sheet1.row(0).set_format(idx, fmt)
+  end
+end
 
       def get_value_width(value)
 
@@ -598,11 +561,9 @@ module XlsExport
 
         idx = 0
         issues.each do |issue|
-          issue_updates = issue.journals.includes(:user, :details).order("#{Journal.table_name}.created_on ASC").to_a
-          next if issue_updates.size == 0
-
-          issue_updates.each do |journal|
-            journal.details.each do |detail|
+          journals = get_visible_journals(issue)
+          journals.each do |journal|
+            journal.visible_details.each do |detail|
               if detail.prop_key == "status_id"
                 row = sheet.row(idx+1)
                 row.replace []
@@ -637,6 +598,8 @@ module XlsExport
         xls_stream.string
       end
 
-    end
-  end
-end
+      # Más funciones y clases
+    end # Final del módulo XLS
+  end # Final del módulo Export
+end # Final del módulo Redmine
+end # Final del módulo XlsExport
