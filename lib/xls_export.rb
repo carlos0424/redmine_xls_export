@@ -39,25 +39,23 @@ module XlsExport
 
         class XLS_QueryColumn
           attr_accessor :name, :sortable, :groupable, :default_order
-          include ::I18n  # Asegura que usamos el módulo I18n correcto
-          
-          def initialize(name, options={})
-            self.name = name
-            self.sortable = options[:sortable]
-            self.groupable = options[:groupable] || false
-            self.groupable = name.to_s if groupable == true
-            self.default_order = options[:default_order]
-            @caption_key = options[:caption] || "field_#{name}"
-          end
-
+          include ApplicationHelper
+          include ::I18n
+        
           def caption
-            if @caption_key.is_a?(Symbol)
-              l(@caption_key)
-            else
-              l(@caption_key.to_sym) rescue @caption_key.to_s.humanize
+            begin
+              if @caption_key.is_a?(Symbol)
+                ::I18n.t(@caption_key.to_s, :default => @caption_key.to_s.humanize)
+              else
+                key = "field_#{name}"
+                ::I18n.t(key, :default => name.to_s.humanize)
+              end
+            rescue => e
+              Rails.logger.error "Error generando caption para #{name}: #{e.message}"
+              name.to_s.humanize
             end
           end
-
+        end
           def sortable?
             !@sortable.nil?
           end
@@ -402,21 +400,82 @@ end
 
       def init_header_columns(query, sheet1, columns, date_formats)
         columns_width = has_id?(query) ? [] : [1]
-        sheet1.row(0).replace []  # Asegurarse de limpiar la fila 0 antes de agregar los títulos.
+        init_row(sheet1.row(0), query, "#")
         
-        columns.each do |c|
-          caption = if c.is_a?(QueryCustomFieldColumn)
-            c.caption || c.custom_field.name
+        # Crear el formato para las cabeceras primero
+        header_format = Spreadsheet::Format.new(
+          :weight => :bold,
+          :pattern => 1,
+          :pattern_bg_color => :gray,
+          :pattern_fg_color => :gray,
+          :font => { :color => :white },
+          :align => :center,
+          :text_wrap => true
+        )
+      
+        # Aplicar el formato a la primera fila completa
+        sheet1.row(0).default_format = header_format
+        
+        columns.each_with_index do |c, idx|
+          caption = case
+            when c.is_a?(QueryCustomFieldColumn)
+              c.custom_field.name.presence || c.name.to_s.humanize
+            when c.respond_to?(:caption)
+              caption = begin
+                c.caption.is_a?(Symbol) ? l(c.caption) : c.caption
+              rescue
+                c.name.to_s.humanize
+              end
+            else
+              l("field_#{c.name}", :default => c.name.to_s.humanize)
+          end
+      
+          # Asegurarnos que el caption no sea nil
+          caption = caption.presence || c.name.to_s.humanize
+          
+          # Insertar el título
+          sheet1.row(0)[idx + (has_id?(query) ? 0 : 1)] = caption.to_s
+          
+          # Aplicar el formato específicamente a esta celda
+          sheet1.row(0).set_format(idx + (has_id?(query) ? 0 : 1), header_format)
+          
+          columns_width << (get_value_width(caption) * 1.1)
+        end
+      
+        # Formato para números en la primera columna
+        sheet1.column(0).default_format = Spreadsheet::Format.new(:number_format => "0")
+        
+        # Formatos específicos para cada tipo de columna
+        columns.each_with_index do |c, idx|
+          col_idx = idx + (has_id?(query) ? 0 : 1)
+          format_options = {}
+          
+          if c.is_a?(QueryCustomFieldColumn)
+            format_options[:number_format] = case c.custom_field.field_format
+              when "int" then "0"
+              when "float" then "0.00"
+              when "date" then date_formats[:start_date]
+            end
           else
-            c.respond_to?(:caption) ? c.caption : l("field_#{c.name}")
+            format_options[:number_format] = case c.name
+              when :done_ratio then "0%"
+              when :estimated_hours, :spent_time then "0.0"
+              when :created_on, :updated_on, :start_date, :due_date, :closed_on
+                date_formats[c.name]
+            end
           end
           
-          puts "Generando título de columna: #{caption}"  # Para depuración, verifica en el log si los títulos se están generando
-          
-          sheet1.row(0) << caption  # Forzar la inclusión de cada título
+          if format_options.present?
+            col_format = Spreadsheet::Format.new(format_options)
+            sheet1.column(col_idx).default_format = col_format
+          end
         end
-        
-        sheet1.column(0).default_format = Spreadsheet::Format.new(:number_format => "0")
+      
+        # Verificar que los títulos se hayan insertado
+        Rails.logger.debug "Títulos de columnas generados:"
+        sheet1.row(0).each_with_index do |title, idx|
+          Rails.logger.debug "Columna #{idx}: #{title}"
+        end
         
         columns_width
       end
