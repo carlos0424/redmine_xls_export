@@ -58,25 +58,23 @@ class XLS_QueryColumn
       ::I18n.t(@caption_key, default: @caption_key.to_s.humanize)
     end
   end
+
+  def sortable?
+    !@sortable.nil?
+  end
+
+  def sortable
+    @sortable.is_a?(Proc) ? @sortable.call : @sortable
+  end
+
+  def value(issue)
+    issue.send name
+  end
+
+  def css_classes
+    name
+  end
 end
-
-
-          def sortable?
-            !@sortable.nil?
-          end
-
-          def sortable
-            @sortable.is_a?(Proc) ? @sortable.call : @sortable
-          end
-
-          def value(issue)
-            issue.send name
-          end
-
-          def css_classes
-            name
-          end
-        end
 
         class XLS_JournalQueryColumn < XLS_QueryColumn
           include CustomFieldsHelper
@@ -467,7 +465,7 @@ def init_header_columns(query, sheet1, columns, date_formats)
    
    columns_width
  end
- 
+
 def update_sheet_formatting(sheet1, columns_width)
   sheet1.row(0).count.times do |idx|
     do_wrap = columns_width[idx] > 60 ? 1 : 0
