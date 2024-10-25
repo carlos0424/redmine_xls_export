@@ -136,6 +136,42 @@ module XlsExport
 
         module_function
 
+
+        def format_datetime(datetime)
+          return nil unless datetime
+          zone = User.current.time_zone
+          zone ? datetime.in_time_zone(zone) : datetime.localtime
+        end
+
+        def format_column_value(issue, column, project, options)
+          case column.name
+            when :done_ratio
+              (Float(issue.send(column.name))) / 100
+            when :description
+              strip_html(issue.description.to_s.gsub("\r", ""), options)
+            when :relations
+              format_relations(issue)
+            when :watcher
+              format_watchers(issue, project)
+            when :spent_time
+              column.value(issue) if User.current.allowed_to?(:view_time_entries, project)
+            when :attachments
+              format_attachments(column.value(issue))
+            when :journal
+              column.value(issue, options)
+            when :project
+              project = issue.send(column.name)
+              project
+            when :created_on, :updated_on, :closed_on
+              datetime = issue.respond_to?(column.name) ? issue.send(column.name) : column.value(issue)
+              format_datetime(datetime)
+            when :"parent.subject"
+              issue.parent&.subject.to_s
+            else
+              issue.respond_to?(column.name) ? issue.send(column.name) : column.value(issue)
+          end
+        end
+
         def l(*args)
           ::I18n.t(*args)
         rescue
@@ -406,8 +442,8 @@ module XlsExport
                 data = [
                   issue.id,
                   issue.project&.name || issue.project_id.to_s,
-                  localtime(issue.created_on),
-                  localtime(journal.created_on),
+                  format_datetime(issue.created_on),
+                  format_datetime(journal.created_on),
                   get_issue_status(detail.old_value, issue_statuses),
                   get_issue_status(detail.value, issue_statuses)
                 ]
@@ -591,7 +627,54 @@ module XlsExport
           %w(Time Date Fixnum Float Integer String).include?(v.class.name) ? v : v.to_s
         end
 
-      end # Final del módulo XLS
-    end # Final del módulo Export
-  end # Final del módulo Redmine
-end # Final del módulo XlsExport
+# Si hay otros métodos que usan localtime, también hay que actualizarlos
+        def journal_details_to_xls(issue, options, book_to_add = nil)
+          journals = get_visible_journals(issue)
+          return nil if journals.size == 0
+
+          Spreadsheet.client_encoding = 'UTF-8'
+          book = book_to_add ? book_to_add : Spreadsheet::Workbook.new
+          sheet1 = book.create_worksheet(name: "%05i - Journal" % [issue.id])
+
+          columns_width = []
+          sheet1.row(0).replace []
+          ['#',l(:field_updated_on),l(:field_user),l(:label_details),l(:field_notes)].each do |c|
+            sheet1.row(0) << c
+            columns_width << (get_value_width(c)*1.1)
+          end
+          sheet1.column(0).default_format = Spreadsheet::Format.new(number_format: "0")
+
+          idx = 0
+          journals.each do |journal|
+            row = sheet1.row(idx+1)
+            row.replace []
+
+            details = ''
+            journal.visible_details.each do |detail|
+              details << "#{show_detail(detail, true)}"
+              details << "\n" unless detail == journal.visible_details.last
+            end
+            details = strip_html(details, options)
+            notes = strip_html(journal.notes? ? journal.notes.to_s : '', options)
+
+            [idx+1, format_datetime(journal.created_on), journal.user.name, details, notes].each_with_index do |e,e_idx|
+              lf_pos = get_value_width(e)
+              columns_width[e_idx] = lf_pos unless columns_width[e_idx] >= lf_pos
+              row << e
+            end
+
+            idx += 1
+          end
+
+          update_sheet_formatting(sheet1,columns_width)
+
+          if book_to_add.nil?
+            xls_stream = StringIO.new('')
+            book.write(xls_stream)
+            xls_stream.string
+          end
+        end
+      end
+    end
+  end
+end
