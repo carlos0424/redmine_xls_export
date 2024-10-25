@@ -400,52 +400,48 @@ end
         return false
       end
 
- # Actualiza el método init_header_columns:
- def init_header_columns(query, sheet1, columns, date_formats)
-  columns_width = has_id?(query) ? [] : [1]
-  init_row(sheet1.row(0), query, "#")
-  
-  columns.each do |c|
-    caption = if c.is_a?(QueryCustomFieldColumn)
-      c.caption || c.custom_field.name
-    else
-      c.respond_to?(:caption) ? c.caption : l("field_#{c.name}")
-    end
-    
-    # Agregamos esta línea para depuración
-    puts "Exportando columna: #{caption}"  # Depuración temporal
-
-    sheet1.row(0) << caption
-    columns_width << (get_value_width(caption) * 1.1)
-  end
-
-  
-  sheet1.column(0).default_format = Spreadsheet::Format.new(:number_format => "0")
-  
-  columns.each_with_index do |c, idx|
-    format_options = {}
-    
-    if c.is_a?(QueryCustomFieldColumn)
-      format_options[:number_format] = case c.custom_field.field_format
-        when "int" then "0"
-        when "float" then "0.00"
-        when "date" then date_formats[:start_date]
-      end
-    else
-      format_options[:number_format] = case c.name
-        when :done_ratio then "0%"
-        when :estimated_hours, :spent_time then "0.0"
-        when :created_on, :updated_on, :start_date, :due_date, :closed_on
-          date_formats[c.name]
-      end
-    end
-    
-    sheet1.column(idx).default_format = Spreadsheet::Format.new(format_options) if format_options.present?
-  end
-  
-  columns_width
-end
+      def init_header_columns(query, sheet1, columns, date_formats)
+        columns_width = has_id?(query) ? [] : [1]
+        init_row(sheet1.row(0), query, "#")
+        
+        columns.each do |c|
+          caption = if c.is_a?(QueryCustomFieldColumn)
+            c.caption || c.custom_field.name
+          else
+            c.respond_to?(:caption) ? c.caption : l("field_#{c.name}")
+          end
+          
+          # Depuración: Verificamos que el título se esté generando
+          puts "Generando título de columna: #{caption}"
       
+          sheet1.row(0) << caption
+          columns_width << (get_value_width(caption) * 1.1)
+        end
+        sheet1.column(0).default_format = Spreadsheet::Format.new(:number_format => "0")
+        
+        # Aplicar formatos de columnas
+        columns.each_with_index do |c, idx|
+          opt = {}
+          if c.is_a?(QueryCustomFieldColumn)
+            opt[:number_format] = case c.custom_field.field_format
+              when "int" then "0"
+              when "float" then "0.00"
+              when "date" then date_formats[:start_date]
+            end
+          else
+            opt[:number_format] = case c.name
+              when :done_ratio then "0%"
+              when :estimated_hours, :spent_time then "0.0"
+              when :created_on, :updated_on, :start_date, :due_date, :closed_on
+                date_formats[c.name]
+            end
+          end
+          sheet1.column(idx).default_format = Spreadsheet::Format.new(opt) unless opt.empty?
+        end
+        
+        columns_width
+      end
+       
 
 def update_sheet_formatting(sheet1, columns_width)
   sheet1.row(0).count.times do |idx|
