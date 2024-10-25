@@ -39,22 +39,25 @@ module XlsExport
 
         class XLS_QueryColumn
           attr_accessor :name, :sortable, :groupable, :default_order
-          include I18n
-
+          include ::I18n  # Asegura que usamos el módulo I18n correcto
+          
           def initialize(name, options={})
             self.name = name
             self.sortable = options[:sortable]
             self.groupable = options[:groupable] || false
-            if groupable == true
-              self.groupable = name.to_s
-            end
+            self.groupable = name.to_s if groupable == true
             self.default_order = options[:default_order]
             @caption_key = options[:caption] || "field_#{name}"
           end
 
           def caption
-            I18n.t(@caption_key) # Usamos las traducciones definidas para el idioma
+            if @caption_key.is_a?(Symbol)
+              l(@caption_key)
+            else
+              l(@caption_key.to_sym) rescue @caption_key.to_s.humanize
+            end
           end
+        end
           
           def sortable?
             !@sortable.nil?
@@ -398,48 +401,47 @@ module XlsExport
         return false
       end
 
-      def init_header_columns(query, sheet1, columns, date_formats)
-        columns_width = has_id?(query) ? [] : [1]
-        init_row(sheet1.row(0), query, "#") # Asegura que el número de fila sea 0 para la cabecera
-      
-        columns.each do |c|
-          sheet1.row(0) << c.caption # Agrega los títulos de las columnas
-          columns_width << (get_value_width(c.caption) * 1.1) # Calcula el ancho de cada columna basado en el título
-        end
-      
-        # Formato de la columna de ID
-        sheet1.column(0).default_format = Spreadsheet::Format.new(:number_format => "0")
-      
-        # Aplica formatos adicionales según el tipo de campo
-        opt = {}
-        columns.each_with_index do |c, idx|
-          width = 0
-          opt.clear
-      
-          if c.is_a?(QueryCustomFieldColumn)
-            case c.custom_field.field_format
-            when "int"
-              opt[:number_format] = "0"
-            when "float"
-              opt[:number_format] = "0.00"
-            end
-          else
-            case c.name
-            when :done_ratio
-              opt[:number_format] = '0%'
-            when :estimated_hours, :spent_time
-              opt[:number_format] = "0.0"
-            when :created_on, :updated_on, :start_date, :due_date, :closed_on
-              opt[:number_format] = date_formats[c.name]
-            end
-          end
-      
-          sheet1.column(idx).default_format = Spreadsheet::Format.new(opt) unless opt.empty?
-          columns_width[idx] = width unless columns_width[idx] >= width
-        end
-      
-        columns_width
+ # Actualiza el método init_header_columns:
+def init_header_columns(query, sheet1, columns, date_formats)
+  columns_width = has_id?(query) ? [] : [1]
+  init_row(sheet1.row(0), query, "#")
+  
+  columns.each do |c|
+    caption = if c.is_a?(QueryCustomFieldColumn)
+      c.caption || c.custom_field.name
+    else
+      c.respond_to?(:caption) ? c.caption : l("field_#{c.name}")
+    end
+    
+    sheet1.row(0) << caption
+    columns_width << (get_value_width(caption) * 1.1)
+  end
+  
+  sheet1.column(0).default_format = Spreadsheet::Format.new(:number_format => "0")
+  
+  columns.each_with_index do |c, idx|
+    format_options = {}
+    
+    if c.is_a?(QueryCustomFieldColumn)
+      format_options[:number_format] = case c.custom_field.field_format
+        when "int" then "0"
+        when "float" then "0.00"
+        when "date" then date_formats[:start_date]
       end
+    else
+      format_options[:number_format] = case c.name
+        when :done_ratio then "0%"
+        when :estimated_hours, :spent_time then "0.0"
+        when :created_on, :updated_on, :start_date, :due_date, :closed_on
+          date_formats[c.name]
+      end
+    end
+    
+    sheet1.column(idx).default_format = Spreadsheet::Format.new(format_options) if format_options.present?
+  end
+  
+  columns_width
+end
       
 
       def update_sheet_formatting(sheet1,columns_width)
