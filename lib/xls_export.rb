@@ -412,9 +412,13 @@ end
       c.respond_to?(:caption) ? c.caption : l("field_#{c.name}")
     end
     
+    # Agregamos esta línea para depuración
+    puts "Exportando columna: #{caption}"  # Depuración temporal
+
     sheet1.row(0) << caption
     columns_width << (get_value_width(caption) * 1.1)
   end
+
   
   sheet1.column(0).default_format = Spreadsheet::Format.new(:number_format => "0")
   
