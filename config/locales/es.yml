@@ -3,26 +3,26 @@ es:
   label_plugin_xlse_watchers: "Exportar seguidores"
   label_plugin_xlse_description: "Exportar descripciones"
   label_plugin_xlse_time: "Exportar tiempo dedicado"
-  label_plugin_xlse_attachments: "Exportar listado de adjuntos"
-  label_plugin_xlse_query_columns_only: "Exportar solamente las columnas seleccionadas"
-  label_plugin_xlse_group: "Separar por criterio de grupo"
+  label_plugin_xlse_attachments: "Exportar lista de adjuntos"
+  label_plugin_xlse_query_columns_only: "Exportar solo las columnas seleccionadas"
+  label_plugin_xlse_group: "Separar por criterio de agrupación"
   label_plugin_xlse_generate_name: "Nombre sugerido"
 
-  label_plugin_xlse_export_status_histories: "Export status histories"
+  label_plugin_xlse_export_status_histories: "Exportar historial de estados"
 
   label_plugin_xlse_issues_limit: "Cantidad de tareas a exportar"
-  label_plugin_xlse_issues_limit_help: "0 - usar predeterminado"
+  label_plugin_xlse_issues_limit_help: "0 - usar valor predeterminado"
   label_plugin_xlse_export_name: "Guardar como..."
-  label_plugin_xlse_strip_html_tags: "Strip HTML tags"
+  label_plugin_xlse_strip_html_tags: "Eliminar etiquetas HTML"
   
-  label_plugin_xlse_settings_title: "Exportar detalles"
+  label_plugin_xlse_settings_title: "Detalles de exportación"
   label_plugin_xlse_button_export: "Exportar"
   label_plugin_xlse_button_back: "Volver a Tareas"
   
   label_plugin_xlse_field_attachment: "Adjuntos"
 
   label_plugin_xlse_export_format: "Exportar a Excel:"
-  label_plugin_xlse_export_format_quick: "Rapida"
+  label_plugin_xlse_export_format_quick: "Rápida"
   label_plugin_xlse_export_format_quick_tooltip: "Exportar usando valores predeterminados"
   label_plugin_xlse_export_format_detailed: "Detallada"
   label_plugin_xlse_export_format_detailed_tooltip: "Elegir opciones antes de exportar"
@@ -31,6 +31,28 @@ es:
   default_start_date_format: "dd.mm.yyyy"
   default_due_date_format: "dd.mm.yyyy"
 
-  plugin_xlse_field_issue_created_on: "Issue created"
-  plugin_xlse_field_status_from: "Status from"
-  plugin_xlse_field_status_to: "Status to"
+  plugin_xlse_field_issue_created_on: "Fecha de creación"
+  plugin_xlse_field_status_from: "Estado anterior"
+  plugin_xlse_field_status_to: "Estado actual"
+
+  label_plugin_xlse_legend_0: "Opciones de columnas"
+  label_plugin_xlse_legend_1: "Opciones de exportación"
+  label_plugin_xlse_legend_1a: "Opciones de formato de fecha"
+  label_plugin_xlse_legend_2: "Opciones extra"
+  label_plugin_xlse_legend_2_disabled: "Opciones extra (instala la gema rubyzip para acceder a ellas)"
+
+  label_plugin_xlse_journal: "Exportar entradas de diario"
+  label_plugin_xlse_journal_worksheets: "Exportar entradas de diario a hojas de trabajo"
+
+  label_plugin_xlse_export_attached: "Exportar adjuntos"
+  label_plugin_xlse_separate_journals: "Diarios de problemas como archivos separados"
+
+  label_plugin_xlse_issues_offset: "Exportar problemas desde"
+  
+  label_plugin_xlse_field_journal: "Diario"
+
+  label_plugin_xlse_date_created: "Creado"
+  label_plugin_xlse_date_updated: "Actualizado"
+  label_plugin_xlse_date_start: "Fecha de inicio"
+  label_plugin_xlse_date_due: "Fecha de vencimiento"
+  label_plugin_xlse_date_closed: "Cerrado"
