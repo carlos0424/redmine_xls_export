@@ -1,5 +1,6 @@
 require 'redmine'
-
+require 'action_view'
+require 'action_view/helpers'
 # Cargar las dependencias necesarias de manera más robusta
 begin
   require 'spreadsheet' # Asegurarse de que la gema spreadsheet está disponible
@@ -7,7 +8,14 @@ begin
 rescue LoadError => e
   Rails.logger.error "XLS export plugin: #{e.message}"
 end
-
+# Asegurarnos de cargar I18n
+Rails.configuration.to_prepare do
+  require_dependency 'application_helper'
+  require_dependency 'issues_helper'
+  require_dependency 'queries_helper'
+  require_dependency 'sort_helper'
+  require_dependency 'custom_fields_helper'
+end
 # Cargar los helpers y librerías del plugin
 require File.expand_path('../lib/xls_export', __FILE__)
 require File.expand_path('../lib/xlse_asset_helpers', __FILE__)

@@ -1,5 +1,4 @@
 require_dependency 'spreadsheet'
-require_dependency 'redmine/i18n'
 require 'erb'
 require 'uri'
 require 'rubygems'
@@ -39,8 +38,10 @@ module XlsExport
 
         class XLS_QueryColumn
           attr_accessor :name, :sortable, :groupable, :default_order
-          include Redmine::I18n  # Cambia ::I18n por Redmine::I18n
-        
+          include ApplicationHelper  # Añade esto
+          include ::I18n  # Cambia esto
+          include ActionView::Helpers::TextHelper  # Añade esto si es necesario
+          
           def initialize(name, options={})
             self.name = name
             self.sortable = options[:sortable]
@@ -49,11 +50,14 @@ module XlsExport
             self.default_order = options[:default_order]
             @caption_key = options[:caption] || "field_#{name}"
           end
-        
+
           def caption
-            l(@caption_key)  # Usa el helper l() de Redmine
+            if @caption_key.is_a?(Symbol)
+              ::I18n.t(@caption_key.to_s, default: @caption_key.to_s.humanize)
+            else
+              ::I18n.t(@caption_key, default: @caption_key.to_s.humanize)
+            end
           end
-        
           def sortable?
             !@sortable.nil?
           end
