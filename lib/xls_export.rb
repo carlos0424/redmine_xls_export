@@ -415,6 +415,8 @@ end
           puts "Generando título de columna: #{caption}"
       
           sheet1.row(0) << caption
+          sheet1.row(0).default_format = Spreadsheet::Format.new(:weight => :bold, :color => :black)
+
           columns_width << (get_value_width(caption) * 1.1)
         end
         sheet1.column(0).default_format = Spreadsheet::Format.new(:number_format => "0")
