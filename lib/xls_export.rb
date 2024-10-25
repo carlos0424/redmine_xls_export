@@ -57,8 +57,7 @@ module XlsExport
               l(@caption_key.to_sym) rescue @caption_key.to_s.humanize
             end
           end
-        end
-          
+
           def sortable?
             !@sortable.nil?
           end
