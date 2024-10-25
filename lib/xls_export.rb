@@ -39,7 +39,9 @@ module XlsExport
 
         class XLS_QueryColumn
           attr_accessor :name, :sortable, :groupable, :default_order
-          include Redmine::I18n
+          # Cambiar la inclusión del módulo I18n
+          include ::I18n
+          include ApplicationHelper
 
           def initialize(name, options={})
             self.name = name
@@ -51,13 +53,16 @@ module XlsExport
           end
 
           def caption
-            if @caption_key.is_a?(Symbol)
-              l(@caption_key.to_s, default: @caption_key.to_s.humanize)
-            elsif @caption_key.start_with?("field_")
-              l(@caption_key, default: name.to_s.humanize)
+            case 
+            when @caption_key.is_a?(Symbol)
+              ::I18n.t(@caption_key.to_s, default: @caption_key.to_s.humanize)
+            when @caption_key.start_with?("field_")
+              ::I18n.t(@caption_key, default: name.to_s.humanize)
             else
-              l("field_#{@caption_key}", default: @caption_key.to_s.humanize)
+              ::I18n.t("field_#{@caption_key}", default: @caption_key.to_s.humanize)
             end
+          rescue
+            name.to_s.humanize
           end
 
           def sortable?
@@ -130,6 +135,13 @@ module XlsExport
         end
 
         module_function
+
+        def l(*args)
+          ::I18n.t(*args)
+        rescue
+          args.first.to_s.humanize
+        end
+
 
         def show_value_for_xls(value)
           if CustomFieldsHelper.instance_method(:show_value).arity == 1
@@ -223,16 +235,15 @@ module XlsExport
           init_row(sheet1.row(0), query, "#")
 
           columns.each do |c|
-            caption = if c.is_a?(QueryCustomFieldColumn)
-              c.custom_field.name
-            elsif c.is_a?(XLS_QueryColumn)
-              c.caption
-            elsif c.respond_to?(:caption)
-              c.caption
-            else
-              l("field_#{c.name}", default: c.name.to_s.humanize)
+            caption = case 
+              when c.is_a?(QueryCustomFieldColumn)
+                c.custom_field.name
+              when c.respond_to?(:caption)
+                c.caption.is_a?(Symbol) ? l(c.caption) : c.caption
+              else
+                l("field_#{c.name}", default: c.name.to_s.humanize)
             end
-            
+
             sheet1.row(0) << caption.to_s
             columns_width << (get_value_width(caption) * 1.1)
           end
