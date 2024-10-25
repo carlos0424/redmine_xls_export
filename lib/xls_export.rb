@@ -37,46 +37,39 @@ module XlsExport
           end
         end
 
-# 1. Actualiza la clase XLS_QueryColumn
-class XLS_QueryColumn
-  attr_accessor :name, :sortable, :groupable, :default_order
-  include ::I18n
-  
-  def initialize(name, options={})
-    self.name = name
-    self.sortable = options[:sortable]
-    self.groupable = options[:groupable] || false
-    self.groupable = name.to_s if groupable == true
-    self.default_order = options[:default_order]
-    @caption_key = options[:caption] || "field_#{name}"
-  end
-
-  def caption
-    if @caption_key.is_a?(Symbol)
-      ::I18n.t(@caption_key.to_s, default: @caption_key.to_s.humanize)
-    elsif @caption_key.start_with?("field_")
-      ::I18n.t(@caption_key, default: name.to_s.humanize)
-    else
-      @caption_key.to_s.humanize
-    end
-  end
-
-  def sortable?
-    !@sortable.nil?
-  end
-
-  def sortable
-    @sortable.is_a?(Proc) ? @sortable.call : @sortable
-  end
-
-  def value(issue)
-    issue.send name
-  end
-
-  def css_classes
-    name
-  end
-end
+        class XLS_QueryColumn
+          attr_accessor :name, :sortable, :groupable, :default_order
+          include Redmine::I18n  # Cambia ::I18n por Redmine::I18n
+        
+          def initialize(name, options={})
+            self.name = name
+            self.sortable = options[:sortable]
+            self.groupable = options[:groupable] || false
+            self.groupable = name.to_s if groupable == true
+            self.default_order = options[:default_order]
+            @caption_key = options[:caption] || "field_#{name}"
+          end
+        
+          def caption
+            l(@caption_key)  # Usa el helper l() de Redmine
+          end
+        
+          def sortable?
+            !@sortable.nil?
+          end
+        
+          def sortable
+            @sortable.is_a?(Proc) ? @sortable.call : @sortable
+          end
+        
+          def value(issue)
+            issue.send name
+          end
+        
+          def css_classes
+            name
+          end
+        end
 
         class XLS_JournalQueryColumn < XLS_QueryColumn
           include CustomFieldsHelper
@@ -403,77 +396,65 @@ end
         return false
       end
 
-# 2. Actualiza el método init_header_columns
-def init_header_columns(query, sheet1, columns, date_formats)
-  columns_width = has_id?(query) ? [] : [1]
-  init_row(sheet1.row(0), query, "#")
-  
-  columns.each do |c|
-    caption = if c.is_a?(QueryCustomFieldColumn)
-      c.custom_field.name
-    elsif c.is_a?(XLS_QueryColumn)
-      c.caption
-    elsif c.respond_to?(:caption)
-      c.caption
-    else
-      field_name = "field_#{c.name}"
-      ::I18n.t(field_name, default: c.name.to_s.humanize)
-    end
-    
-    sheet1.row(0) << caption.to_s
-    columns_width << (get_value_width(caption) * 1.1)
-  end
-  
-  # Aplicar formato a las columnas
-  sheet1.column(0).default_format = Spreadsheet::Format.new(:number_format => "0")
-  
-  # Formato especial para la cabecera
-  header_format = Spreadsheet::Format.new(
-    weight: :bold,
-    pattern: 1,
-    pattern_fg_color: :gray,
-    pattern_bg_color: :gray,
-    color: :white,
-    align: :center
-  )
-  
-  # Aplicar formato a cada celda de la cabecera
-  sheet1.row(0).count.times do |i|
-    sheet1.row(0).set_format(i, header_format)
-  end
-  
-  # Aplicar formatos específicos para cada tipo de columna
-  columns.each_with_index do |c, idx|
-    format_options = {}
-    
-    if c.is_a?(QueryCustomFieldColumn)
-      case c.custom_field.field_format
-      when "int"
-        format_options[:number_format] = "0"
-      when "float"
-        format_options[:number_format] = "0.00"
-      when "date"
-        format_options[:number_format] = date_formats[:start_date]
-      end
-    else
-      format_options[:number_format] = case c.name
-      when :done_ratio
-        "0%"
-      when :estimated_hours, :spent_time
-        "0.0"
-      when :created_on, :updated_on, :start_date, :due_date, :closed_on
-        date_formats[c.name]
-      end
-    end
-    
-    if format_options.present?
-      sheet1.column(idx).default_format = Spreadsheet::Format.new(format_options)
-    end
-  end
-  
-  columns_width
-end
+      def init_header_columns(query, sheet1, columns, date_formats)
+        columns_width = has_id?(query) ? [] : [1]
+        init_row(sheet1.row(0), query, "#")
+      
+        columns.each do |c|
+          caption = case 
+            when c.is_a?(QueryCustomFieldColumn)
+              c.custom_field.name
+            when c.is_a?(XLS_QueryColumn)
+              c.caption
+            when c.respond_to?(:caption)
+              c.caption
+            else
+              l("field_#{c.name}", default: c.name.to_s.humanize)
+          end
+      
+          sheet1.row(0) << caption.to_s
+          columns_width << (get_value_width(caption) * 1.1)
+        end
+      
+        # Formato de la columna ID
+        sheet1.column(0).default_format = Spreadsheet::Format.new(:number_format => "0")
+      
+        # Formato especial para la cabecera
+        header_format = Spreadsheet::Format.new(
+          :weight => :bold,
+          :pattern => 1,
+          :pattern_bg_color => :gray,
+          :pattern_fg_color => :gray,
+          :font => { :color => :white },
+          :align => :center
+        )
+      
+        sheet1.row(0).count.times do |i|
+          sheet1.row(0).set_format(i, header_format)
+        end
+      
 
+        columns.each_with_index do |c, idx|
+          format = case
+            when c.is_a?(QueryCustomFieldColumn)
+              case c.custom_field.field_format
+                when "int" then { :number_format => "0" }
+                when "float" then { :number_format => "0.00" }
+                when "date" then { :number_format => date_formats[:start_date] }
+              end
+            when [:done_ratio].include?(c.name)
+              { :number_format => "0%" }
+            when [:estimated_hours, :spent_time].include?(c.name)
+              { :number_format => "0.0" }
+            when [:created_on, :updated_on, :start_date, :due_date, :closed_on].include?(c.name)
+              { :number_format => date_formats[c.name] }
+          end
+      
+          sheet1.column(idx).default_format = Spreadsheet::Format.new(format) if format
+        end
+      
+        columns_width
+      end
 def update_sheet_formatting(sheet1, columns_width)
   sheet1.row(0).count.times do |idx|
     do_wrap = columns_width[idx] > 60 ? 1 : 0
