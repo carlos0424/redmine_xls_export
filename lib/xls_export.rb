@@ -51,32 +51,13 @@ module XlsExport
           end
         
           def caption
-            case name.to_s
-            when 'subject'
-              l(:field_subject)
-            when 'status'
-              l(:field_status)
-            when 'priority'
-              l(:field_priority)
-            when 'assigned_to'
-              l(:field_assigned_to)
-            when 'updated_on'
-              l(:field_updated_on)
-            when 'category'
-              l(:field_category)
-            when 'fixed_version'
-              l(:field_fixed_version)
-            when 'start_date'
-              l(:field_start_date)
-            when 'due_date'
-              l(:field_due_date)
-            when 'estimated_hours'
-              l(:field_estimated_hours)
-            when 'spent_hours'
-              l(:label_spent_time)
-            else
-              l("field_#{name}", default: name.to_s.humanize)
-            end
+            # Intentar primero las traducciones del plugin
+            plugin_key = "label_plugin_xlse_field_#{name}"
+            return l(plugin_key) if l(plugin_key, default: '').present?
+        
+            # Luego intentar las traducciones estándar de Redmine
+            standard_key = "field_#{name}"
+            l(standard_key, default: name.to_s.humanize)
           end
         end
 
@@ -408,9 +389,8 @@ module XlsExport
 # Reemplaza solo el método init_header_columns con esta versión:
 def init_header_columns(query, sheet1, columns, date_formats)
   columns_width = has_id?(query) ? [] : [1]
-  init_row(sheet1.row(0), query, "#")
   
-  # Formato para las cabeceras
+  # Establecer el formato de cabecera
   header_format = Spreadsheet::Format.new(
     weight: :bold,
     pattern: 1,
@@ -418,59 +398,70 @@ def init_header_columns(query, sheet1, columns, date_formats)
     pattern_fg_color: :gray,
     color: :white,
     align: :center,
+    text_wrap: true,
     font: { bold: true }
   )
 
-  ## Agregar títulos de columna
-  columns.each_with_index do |c, idx|
-    # Determinar el título de la columna
-    header_text = case
+  # Inicializar la primera fila y aplicar formato base
+  init_row(sheet1.row(0), query, "#")
+  sheet1.row(0).default_format = header_format
+
+  # Procesar cada columna
+  columns.each do |c|
+    title = case
       when c.is_a?(QueryCustomFieldColumn)
         c.custom_field.name
-      when c.is_a?(XLS_QueryColumn)
+      when c.is_a?(XLS_JournalQueryColumn)
+        l(:label_plugin_xlse_field_journal)
+      when c.is_a?(XLS_AttachmentQueryColumn)
+        l(:label_plugin_xlse_field_attachment)
+      when c.name == :spent_time
+        l(:label_spent_time)
+      when c.respond_to?(:caption)
         c.caption
-      when c.is_a?(QueryColumn)
-        l("field_#{c.name}", default: c.name.to_s.humanize)
       else
-        c.respond_to?(:caption) ? c.caption : c.name.to_s.humanize
+        l("field_#{c.name}", default: c.name.to_s.humanize)
     end
 
-    # Asegurarse de que header_text no sea nil
-    header_text = header_text.presence || c.name.to_s.humanize
+    # Asegurar que el título no sea vacío
+    title = title.presence || c.name.to_s.humanize
     
-    # Insertar el título y aplicar formato
-    sheet1.row(0)[idx] = header_text.to_s
-    sheet1.row(0).set_format(idx, header_format.dup)
+    # Agregar el título a la fila
+    sheet1.row(0) << title.to_s
     
     # Calcular el ancho de la columna
-    width = get_value_width(header_text) * 1.1
+    width = get_value_width(title) * 1.1
     columns_width << width
     
-    # Establecer el ancho de la columna
-    sheet1.column(idx).width = [width, 60].min
+    # Establecer el ancho de la columna con un máximo de 60
+    sheet1.column(columns_width.size - 1).width = [width, 60].min
   end
 
-  # Formatos específicos para las columnas
+  # Establecer formato para las columnas
+  sheet1.column(0).default_format = Spreadsheet::Format.new(number_format: "0")
+
+  # Aplicar formatos específicos para cada columna
   columns.each_with_index do |c, idx|
-    format_options = case
-      when c.is_a?(QueryCustomFieldColumn)
-        case c.custom_field.field_format
-          when "int" then { number_format: "0" }
-          when "float" then { number_format: "0.00" }
-          when "date" then { number_format: date_formats[:start_date] }
-        end
-      else
-        case c.name
-          when :done_ratio then { number_format: "0%" }
-          when :estimated_hours, :spent_time then { number_format: "0.0" }
-          when :created_on, :updated_on, :start_date, :due_date, :closed_on
-            { number_format: date_formats[c.name] }
-        end
+    format_options = if c.is_a?(QueryCustomFieldColumn)
+      case c.custom_field.field_format
+        when "int" then { number_format: "0" }
+        when "float" then { number_format: "0.00" }
+        when "date" then { number_format: date_formats[:start_date] }
+      end
+    else
+      case c.name
+        when :done_ratio then { number_format: "0%" }
+        when :estimated_hours, :spent_time then { number_format: "0.0" }
+        when :created_on then { number_format: date_formats[:created_on] }
+        when :updated_on then { number_format: date_formats[:updated_on] }
+        when :start_date then { number_format: date_formats[:start_date] }
+        when :due_date then { number_format: date_formats[:due_date] }
+        when :closed_on then { number_format: date_formats[:closed_on] }
+      end
     end
 
     if format_options
-      column_format = Spreadsheet::Format.new(format_options)
-      sheet1.column(idx).default_format = column_format
+      sheet1.column(idx).default_format = Spreadsheet::Format.new(format_options)
     end
   end
 
